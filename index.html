@@ -190,9 +190,8 @@ td.wrapc{white-space:normal;line-height:1.45;unicode-bidi:plaintext}
   <div class="box">
     <h2>Engineering Activity</h2>
     <p>As-builts, GIS and issues across the projects.</p>
-    <input class="f" id="lem" type="email" placeholder="Email" autocomplete="username">
-    <input class="f" id="lpw" type="password" placeholder="Password" autocomplete="current-password">
-    <button class="btn on" id="lgo">Sign in</button>
+    <select class="f" id="lname"><option value="">Loading names…</option></select>
+    <button class="btn on" id="lgo">Continue</button>
     <div id="lerr"></div>
   </div>
 </div>
@@ -218,7 +217,12 @@ td.wrapc{white-space:normal;line-height:1.45;unicode-bidi:plaintext}
 <script>
 const SB_URL='https://ivmmnsjiekhjxkhllncb.supabase.co';
 const SB_KEY='sb_publishable_RTHsaxZXVmRBQziLbFJX8g_PAaZzIbF';
-const BUILD='ENG 2026-08-18 · e1';
+const BUILD='ENG 2026-08-18 · e2';
+/* This app opens on a name alone. The key below is what it signs in with, and
+   it sits in a file anyone can read — so the tracker is effectively open to
+   anyone who has the address. That was a deliberate choice; putting a password
+   field back is a five-minute change. */
+const APP_PW='eng-tracker-2026-open';
 
 let SESSION=null, ME=null;
 let PROJECTS=[], PEOPLE=[], AB=[], GIS=[], ISSUES=[];
@@ -520,31 +524,55 @@ function start(){
   SORT={k:COLS.asbuilts[0].k,dir:1};
   paint();
 }
+/* Names come from the directory; each carries the sign-in address this app
+   uses. There is no password to type — see APP_PW below. */
+let DIR=[];
+async function loadDirectory(){
+  const sel=$('lname');
+  try{
+    const r=await fetch(SB_URL+'/rest/v1/eng_signin?order=seq.asc',
+      {headers:{apikey:SB_KEY,Authorization:'Bearer '+SB_KEY}});
+    DIR=await r.json();
+    if(!Array.isArray(DIR)||!DIR.length)throw new Error('empty');
+    sel.innerHTML='<option value="">Choose your name…</option>'+
+      DIR.map((d,i)=>`<option value="${i}">${esc(d.name)}</option>`).join('');
+    let last=null;try{last=localStorage.getItem('eng-who');}catch(e){}
+    if(last!==null&&DIR[last])sel.value=last;
+  }catch(e){
+    sel.innerHTML='<option value="">Could not load the name list</option>';
+  }
+}
 $('lgo').onclick=async()=>{
-  const b=$('lgo');b.disabled=true;b.textContent='Signing in…';$('lerr').textContent='';
+  const i=$('lname').value;
+  const who=i===''?null:DIR[i];
+  const b=$('lgo'), err=$('lerr');
+  if(!who){err.textContent='Choose your name first.';return;}
+  b.disabled=true;b.textContent='Opening…';err.textContent='';
   try{
     const r=await fetch(SB_URL+'/auth/v1/token?grant_type=password',{method:'POST',
       headers:{apikey:SB_KEY,'Content-Type':'application/json'},
-      body:JSON.stringify({email:$('lem').value.trim(),password:$('lpw').value})});
+      body:JSON.stringify({email:who.email,password:APP_PW})});
     const d=await r.json();
-    if(!r.ok)throw new Error(d.error_description||d.msg||'Could not sign in');
+    if(!r.ok)throw new Error(d.error_description||d.msg||'Could not open the tracker');
     SESSION=d;save();
+    try{localStorage.setItem('eng-who',i);}catch(e){}
     await loadAll();
-    if(!ME){throw new Error('That account is not on this tracker yet. Ask an administrator to add you.');}
+    if(!ME)throw new Error('That name is not on this tracker yet.');
     start();
-  }catch(e){$('lerr').textContent=e.message;b.disabled=false;b.textContent='Sign in';}
+  }catch(e){err.textContent=e.message;b.disabled=false;b.textContent='Continue';}
 };
-$('lpw').addEventListener('keydown',e=>{if(e.key==='Enter')$('lgo').click();});
 $('out').onclick=()=>{try{localStorage.removeItem('eng-session');}catch(e){}location.reload();};
 
 (async()=>{
   if(await resume()){
     try{ await loadAll(); }
     catch(e){ console.warn('Could not load',e);
-      $('login').classList.add('on'); $('lerr').textContent=e.message; return; }
+      $('login').classList.add('on'); loadDirectory();
+      $('lerr').textContent=e.message; return; }
     if(ME){ try{ start(); }catch(e){ console.warn('Start-up hiccup',e); } return; }
   }
   $('login').classList.add('on');
+  loadDirectory();
 })();
 </script>
 </body>
