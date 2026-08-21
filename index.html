@@ -257,6 +257,18 @@ table.daily tr.td-today td{background:var(--chip)}
     overflow-wrap:anywhere;color:#000}
   table.rtbl tr{page-break-inside:avoid}
 }
+
+.hist{margin:16px 0 4px;border-top:1px solid var(--line);padding-top:14px}
+.hist>label{display:block;font-size:10px;font-weight:700;letter-spacing:.1em;
+  text-transform:uppercase;color:var(--ink3);margin-bottom:8px}
+.hrow{display:flex;align-items:center;gap:9px;flex-wrap:wrap;padding:8px 10px;margin-bottom:6px;
+  background:var(--card);border:1px solid var(--line);border-radius:10px;font-size:12px}
+.hrow.cur{border-color:rgba(168,85,247,.4)}
+.hrow b{font-family:var(--mono);color:var(--ink)}
+.hrow span{color:var(--ink2);font-family:var(--mono);font-size:11.5px}
+.hrow i{margin-left:auto;color:var(--ink3);font-style:normal;font-size:11px}
+.hrow .hx{color:var(--ink3);opacity:.6;font-size:12px}
+.hrow .hx:hover{color:#fda4af;opacity:1}
 </style>
 </head>
 <body>
@@ -294,10 +306,10 @@ table.daily tr.td-today td{background:var(--chip)}
 <script>
 const SB_URL='https://ivmmnsjiekhjxkhllncb.supabase.co';
 const SB_KEY='sb_publishable_RTHsaxZXVmRBQziLbFJX8g_PAaZzIbF';
-const BUILD='ENG 2026-08-19 · e5';
+const BUILD='ENG 2026-08-19 · e6';
 
 let SESSION=null, ME=null;
-let PROJECTS=[], PEOPLE=[], AB=[], SD=[], GIS=[], ISSUES=[];
+let PROJECTS=[], PEOPLE=[], AB=[], SD=[], GIS=[], ISSUES=[], HIST=[];
 let PROJ=null, TAB='asbuilts', Q='', F='', SORT={k:'submittal_no',dir:1};
 
 const isoDay=d=>{const x=(d instanceof Date)?d:new Date(d);
@@ -343,16 +355,17 @@ function toast(m){const t=$('toast');t.textContent=m;t.classList.add('on');
 
 /* ---------- loading ---------- */
 async function loadAll(){
-  const [pr,pe,ab,sd,gi,is,me]=await Promise.all([
+  const [pr,pe,ab,sd,gi,is,me,hs]=await Promise.all([
     api('eng_projects?order=seq.asc'),
     api('eng_people?order=name.asc'),
     api('eng_asbuilts?deleted_at=is.null&order=id.asc&limit=5000'),
     api('eng_shopdrawings?deleted_at=is.null&order=id.asc&limit=2000'),
     api('eng_gis?deleted_at=is.null&order=id.asc&limit=2000'),
     api('eng_issues?deleted_at=is.null&order=id.asc&limit=2000'),
-    api('eng_members?select=name,role&limit=1')]);
+    api('eng_members?select=name,role&limit=1'),
+    api('eng_history?order=id.asc&limit=5000')]);
   PROJECTS=pr||[];PEOPLE=pe||[];AB=ab||[];SD=sd||[];GIS=gi||[];ISSUES=is||[];
-  ME=(me&&me[0])||null;
+  ME=(me&&me[0])||null; HIST=hs||[];
 }
 
 /* ---------- helpers ---------- */
@@ -413,6 +426,7 @@ const COLS={
     {k:'planned_date', t:'Planned',    w:110,cls:'mono'},
     {k:'submitted_date',t:'Submitted', w:110,cls:'mono'},
     {k:'received_date',t:'Received',   w:110,cls:'mono'},
+    {k:'cycles',       t:'Cycles',     w:70,calc:r=>cyclesOf('shop',r.id).length||''},
     {k:'owner_id',     t:'Owner',      w:150,calc:r=>personName(r.owner_id)},
     {k:'project_id',   t:'Project',    w:150,calc:r=>projName(r.project_id)}
   ],
@@ -533,10 +547,19 @@ function openSheet(id){
         <select id="f-project_id"${canEdit()?'':' disabled'}>
           <option value="">— none —</option>${PROJECTS.map(p=>
           `<option value="${p.id}"${row.project_id===p.id?' selected':''}>${esc(p.name)}</option>`).join('')}</select></div>
+      ${KIND[TAB]?historyHTML(KIND[TAB],row.id):''}
       <div class="hint" style="color:var(--ink3);font-size:11.5px">Changes save as you leave each box.</div>
     </div>`;
   sh.classList.add('on');
   document.getElementById('shx').onclick=()=>{sh.classList.remove('on');};
+  const lg=document.getElementById('logcy');
+  if(lg)lg.onclick=()=>logCycle(KIND[TAB],row.id);
+  sh.querySelectorAll('[data-del]').forEach(b=>b.onclick=async e=>{
+    e.stopPropagation(); const hid=+b.dataset.del;
+    try{ await api('eng_history?id=eq.'+hid,{method:'DELETE'});
+      HIST=HIST.filter(h=>h.id!==hid); await reloadRecord(KIND[TAB],row.id);
+      toast('Cycle removed'); }catch(err){ toast(err.message); }
+  });
   if(!canEdit())return;
   fields.concat([['project_id','','sel']]).forEach(([k])=>{
     const el=document.getElementById('f-'+k); if(!el)return;
@@ -650,6 +673,67 @@ function exportPDF(){
     window.removeEventListener('afterprint',done);};
   window.addEventListener('afterprint',done);
   window.print(); setTimeout(done,1200);
+}
+
+
+/* ---------- submission history ---------- */
+const KIND={asbuilts:'asbuilt',shop:'shop',gis:'gis'};
+const cyclesOf=(kind,id)=>HIST.filter(h=>h.kind===kind&&h.record_id===id)
+  .sort((a,b)=>(parseFloat(String(a.revision).replace(/\D/g,''))||0)
+              -(parseFloat(String(b.revision).replace(/\D/g,''))||0)||a.id-b.id);
+function historyHTML(kind,id){
+  const cy=cyclesOf(kind,id);
+  return `<div class="hist"><label>Submission history</label>
+    ${cy.length?cy.map((h,i)=>{
+      const days=(h.submitted&&h.received)
+        ? Math.round((new Date(h.received)-new Date(h.submitted))/864e5) : null;
+      return `<div class="hrow${i===cy.length-1?' cur':''}" data-h="${h.id}">
+        <b>Rev ${esc(h.revision)}</b>
+        <span>${h.submitted?esc(h.submitted):'—'} → ${h.received?esc(h.received):'with the reviewer'}</span>
+        ${h.outcome?pill(h.outcome):''}
+        ${days!==null?`<i>${days}d</i>`:''}
+        ${canEdit()?`<button class="hx" data-del="${h.id}" title="Remove">✕</button>`:''}
+      </div>`;}).join('')
+      :'<div style="color:var(--ink3);font-size:12px;padding:6px 0">No cycles recorded yet.</div>'}
+    ${canEdit()?`<button class="btn" id="logcy" style="margin-top:8px">Log a submission</button>`:''}
+  </div>`;
+}
+function logCycle(kind,id){
+  const cy=cyclesOf(kind,id);
+  const next=cy.length
+    ? String((parseFloat(String(cy[cy.length-1].revision).replace(/\D/g,''))||0)+1) : '0';
+  const dlg=msgBox('Log a submission',
+    `<div class="dfl"><label>Revision</label><input class="f" id="cr" value="${next}">
+      <div class="two"><div><label>Sent</label><input class="f" type="date" id="cs" value="${today}"></div>
+      <div><label>Replied</label><input class="f" type="date" id="cc"></div></div>
+      <label>Outcome</label>
+      <select class="f" id="co"><option value="">— still with the reviewer —</option>
+        ${REVIEW.filter(r=>r!=='Not Submitted').map(r=>`<option>${esc(r)}</option>`).join('')}</select>
+      <div style="color:var(--ink3);font-size:11.5px;margin-top:8px">
+        The record takes its dates and status from the newest cycle.</div></div>`,
+    [['Cancel',null,''],['Save',async()=>{
+      const body={kind,record_id:id,
+        revision:dlg.querySelector('#cr').value.trim()||next,
+        submitted:dlg.querySelector('#cs').value,
+        received:dlg.querySelector('#cc').value,
+        outcome:dlg.querySelector('#co').value,
+        actor:(ME&&ME.name)||''};
+      try{
+        const made=await api('eng_history',{method:'POST',body:JSON.stringify(body)});
+        if(made&&made[0])HIST.push(made[0]);
+        await reloadRecord(kind,id);
+        toast('Submission logged');
+      }catch(e){ toast(e.message); }
+    },'on']]);
+}
+async function reloadRecord(kind,id){
+  const table = kind==='shop'?'eng_shopdrawings':kind==='gis'?'eng_gis':'eng_asbuilts';
+  const list  = kind==='shop'?SD:kind==='gis'?GIS:AB;
+  try{
+    const fresh=await api(table+'?id=eq.'+id);
+    if(fresh&&fresh[0]){const i=list.findIndex(r=>r.id===id); if(i>=0)Object.assign(list[i],fresh[0]);}
+  }catch(e){}
+  paint(); openSheet(id);
 }
 
 /* ---------- painting ---------- */
