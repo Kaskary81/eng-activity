@@ -191,7 +191,8 @@ td.wrapc{white-space:normal;line-height:1.45;unicode-bidi:plaintext}
     <h2>Engineering Activity</h2>
     <p>As-builts, GIS and issues across the projects.</p>
     <select class="f" id="lname"><option value="">Loading names…</option></select>
-    <button class="btn on" id="lgo">Continue</button>
+    <input class="f" id="lpw" type="password" placeholder="Password" autocomplete="current-password">
+    <button class="btn on" id="lgo">Sign in</button>
     <div id="lerr"></div>
   </div>
 </div>
@@ -217,15 +218,10 @@ td.wrapc{white-space:normal;line-height:1.45;unicode-bidi:plaintext}
 <script>
 const SB_URL='https://ivmmnsjiekhjxkhllncb.supabase.co';
 const SB_KEY='sb_publishable_RTHsaxZXVmRBQziLbFJX8g_PAaZzIbF';
-const BUILD='ENG 2026-08-18 · e2';
-/* This app opens on a name alone. The key below is what it signs in with, and
-   it sits in a file anyone can read — so the tracker is effectively open to
-   anyone who has the address. That was a deliberate choice; putting a password
-   field back is a five-minute change. */
-const APP_PW='eng-tracker-2026-open';
+const BUILD='ENG 2026-08-18 · e3';
 
 let SESSION=null, ME=null;
-let PROJECTS=[], PEOPLE=[], AB=[], GIS=[], ISSUES=[];
+let PROJECTS=[], PEOPLE=[], AB=[], SD=[], GIS=[], ISSUES=[];
 let PROJ=null, TAB='asbuilts', Q='', F='', SORT={k:'submittal_no',dir:1};
 
 const isoDay=d=>{const x=(d instanceof Date)?d:new Date(d);
@@ -271,20 +267,22 @@ function toast(m){const t=$('toast');t.textContent=m;t.classList.add('on');
 
 /* ---------- loading ---------- */
 async function loadAll(){
-  const [pr,pe,ab,gi,is,me]=await Promise.all([
+  const [pr,pe,ab,sd,gi,is,me]=await Promise.all([
     api('eng_projects?order=seq.asc'),
     api('eng_people?order=name.asc'),
     api('eng_asbuilts?deleted_at=is.null&order=id.asc&limit=5000'),
+    api('eng_shopdrawings?deleted_at=is.null&order=id.asc&limit=2000'),
     api('eng_gis?deleted_at=is.null&order=id.asc&limit=2000'),
     api('eng_issues?deleted_at=is.null&order=id.asc&limit=2000'),
     api('eng_members?select=name,role&limit=1')]);
-  PROJECTS=pr||[];PEOPLE=pe||[];AB=ab||[];GIS=gi||[];ISSUES=is||[];
+  PROJECTS=pr||[];PEOPLE=pe||[];AB=ab||[];SD=sd||[];GIS=gi||[];ISSUES=is||[];
   ME=(me&&me[0])||null;
 }
 
 /* ---------- helpers ---------- */
 const byProj = rows => PROJ ? rows.filter(r=>r.project_id===PROJ) : rows;
 const abFor  = () => byProj(AB);
+const sdFor  = () => byProj(SD);
 const gisFor = () => byProj(GIS);
 const issFor = () => byProj(ISSUES);
 const personName = id => (PEOPLE.find(p=>p.id===id)||{}).name || '';
@@ -306,6 +304,7 @@ const pill = s => s ? `<span class="pill" style="background:${SCOL[s]||'var(--ch
 /* ---------- the three registers ---------- */
 const TABS=[
   {k:'asbuilts',t:'As-Builts', n:()=>abFor().length},
+  {k:'shop',    t:'Shop Drawings',n:()=>sdFor().length},
   {k:'gis',     t:'GIS',       n:()=>gisFor().length},
   {k:'issues',  t:'Issues',    n:()=>issFor().length},
   {k:'overview',t:'Overview',  n:()=>0}
@@ -325,6 +324,19 @@ const COLS={
     {k:'invoice_no',  t:'Invoice',  w:80},
     {k:'comments',    t:'Comments', w:280,wrap:1},
     {k:'project_id',  t:'Project',  w:150,calc:r=>projName(r.project_id)}
+  ],
+  shop:[
+    {k:'submittal_no', t:'Submittal',  w:170,cls:'mono'},
+    {k:'description',  t:'Description',w:300,wrap:1},
+    {k:'discipline',   t:'Discipline', w:140},
+    {k:'review_status',t:'Review',     w:150,pill:1},
+    {k:'zone',         t:'Zone',       w:100},
+    {k:'last_revision',t:'Rev',        w:60},
+    {k:'planned_date', t:'Planned',    w:110,cls:'mono'},
+    {k:'submitted_date',t:'Submitted', w:110,cls:'mono'},
+    {k:'received_date',t:'Received',   w:110,cls:'mono'},
+    {k:'owner_id',     t:'Owner',      w:150,calc:r=>personName(r.owner_id)},
+    {k:'project_id',   t:'Project',    w:150,calc:r=>projName(r.project_id)}
   ],
   gis:[
     {k:'description',  t:'Description',w:300,wrap:1},
@@ -349,14 +361,15 @@ const COLS={
   ]
 };
 function rowsNow(){
-  let rows = TAB==='gis'?gisFor() : TAB==='issues'?issFor() : abFor();
+  let rows = TAB==='gis'?gisFor() : TAB==='issues'?issFor()
+           : TAB==='shop'?sdFor() : abFor();
   if(F==='open'){
     rows = TAB==='asbuilts' ? rows.filter(r=>!AB_DONE(r.status))
-         : TAB==='gis'      ? rows.filter(r=>!GIS_OK(r.review_status))
+         : (TAB==='gis'||TAB==='shop') ? rows.filter(r=>!GIS_OK(r.review_status))
                             : rows.filter(r=>ISS_OPEN(r.status));
   } else if(F==='done'){
     rows = TAB==='asbuilts' ? rows.filter(r=>AB_DONE(r.status))
-         : TAB==='gis'      ? rows.filter(r=>GIS_OK(r.review_status))
+         : (TAB==='gis'||TAB==='shop') ? rows.filter(r=>GIS_OK(r.review_status))
                             : rows.filter(r=>!ISS_OPEN(r.status));
   } else if(F==='late'){
     rows = rows.filter(r=>r.target_date&&r.target_date<today&&ISS_OPEN(r.status));
@@ -378,12 +391,13 @@ function rowsNow(){
 
 /* ---------- painting ---------- */
 function paintRail(){
-  const all=AB.length+GIS.length+ISSUES.length;
+  const all=AB.length+SD.length+GIS.length+ISSUES.length;
   $('rail').innerHTML=
     `<button class="pj ${PROJ===null?'on':''}" data-p=""><b>All projects</b>
        <span>${all} records</span></button>`+
     PROJECTS.map(p=>{
       const n=AB.filter(r=>r.project_id===p.id).length
+             +SD.filter(r=>r.project_id===p.id).length
              +GIS.filter(r=>r.project_id===p.id).length
              +ISSUES.filter(r=>r.project_id===p.id).length;
       return `<button class="pj ${PROJ===p.id?'on':''}" data-p="${p.id}">
@@ -407,7 +421,8 @@ function tile(k,v,p,col,frac){
       `<div class="bar"><i style="width:${Math.max(0,Math.min(100,frac))}%;background:${col}"></i></div>`}</div>`;
 }
 function paintKpis(){
-  const ab=abFor(), gi=gisFor(), is=issFor();
+  const ab=abFor(), gi=gisFor(), is=issFor(), sd=sdFor();
+  const sdOk=sd.filter(r=>GIS_OK(r.review_status)).length;
   const abDone=ab.filter(r=>AB_DONE(r.status)).length;
   const giOk=gi.filter(r=>GIS_OK(r.review_status)).length;
   const isOpen=is.filter(r=>ISS_OPEN(r.status)).length;
@@ -417,6 +432,8 @@ function paintKpis(){
       abDone+' of '+ab.length,'var(--good)', ab.length?abDone/ab.length*100:0)+
     tile('Not submitted', ab.length-abDone,'as-built drawings','var(--hot)',
       ab.length?(ab.length-abDone)/ab.length*100:0)+
+    tile('Shop drawings approved', sdOk+' of '+sd.length,'submittals','var(--good)',
+      sd.length?sdOk/sd.length*100:0)+
     tile('GIS approved', giOk+' of '+gi.length,'submittals','var(--good)',
       gi.length?giOk/gi.length*100:0)+
     tile('Issues open', isOpen,'of '+is.length+' logged','var(--warn)',
@@ -427,7 +444,7 @@ function paintKpis(){
 function paintTools(){
   if(TAB==='overview'){ $('tools').innerHTML=''; return; }
   const F1 = TAB==='issues' ? [['','Everything'],['open','Open'],['done','Resolved'],['late','Past target']]
-           : TAB==='gis'    ? [['','Everything'],['open','Not approved'],['done','Approved']]
+           : (TAB==='gis'||TAB==='shop') ? [['','Everything'],['open','Not approved'],['done','Approved']]
                             : [['','Everything'],['open','Not submitted'],['done','Submitted']];
   $('tools').innerHTML=
     `<input class="f" id="q" placeholder="Search…" style="min-width:200px;flex:1;max-width:340px"
@@ -443,7 +460,8 @@ function paintTable(){
   if(TAB==='overview'){ paintOverview(); return; }
   const cols=COLS[TAB], rows=rowsNow();
   if($('count'))$('count').textContent=rows.length+' of '+
-    (TAB==='gis'?gisFor().length:TAB==='issues'?issFor().length:abFor().length);
+    (TAB==='gis'?gisFor().length:TAB==='issues'?issFor().length
+     :TAB==='shop'?sdFor().length:abFor().length);
   if(!rows.length){
     const none = TAB==='asbuilts' && AB.length===0;
     $('wrap').innerHTML=`<div class="empty"><div class="big">${none?'📥':'🔍'}</div>
@@ -492,6 +510,8 @@ function paintOverview(){
     ${bars('As-builts by project', group(ab,r=>projName(r.project_id),r=>AB_DONE(r.status)))}
     ${bars('As-builts by discipline', group(ab,r=>r.discipline,r=>AB_DONE(r.status)))}
     ${bars('Issues by project', group(is,r=>projName(r.project_id),r=>!ISS_OPEN(r.status)),'var(--warn)')}
+    ${bars('Shop drawings by project', group(sdFor(),r=>projName(r.project_id),r=>GIS_OK(r.review_status)))}
+    ${bars('Shop drawings by discipline', group(sdFor(),r=>r.discipline,r=>GIS_OK(r.review_status)))}
     ${bars('GIS by project', group(gi,r=>projName(r.project_id),r=>GIS_OK(r.review_status)))}
     ${bars('As-builts by category', group(ab,r=>r.category,r=>AB_DONE(r.status)))}
     ${bars('Issues by target month', group(is.filter(r=>r.identified_date),
@@ -547,11 +567,12 @@ $('lgo').onclick=async()=>{
   const who=i===''?null:DIR[i];
   const b=$('lgo'), err=$('lerr');
   if(!who){err.textContent='Choose your name first.';return;}
-  b.disabled=true;b.textContent='Opening…';err.textContent='';
+  if(!$('lpw').value){err.textContent='Enter your password.';return;}
+  b.disabled=true;b.textContent='Signing in…';err.textContent='';
   try{
     const r=await fetch(SB_URL+'/auth/v1/token?grant_type=password',{method:'POST',
       headers:{apikey:SB_KEY,'Content-Type':'application/json'},
-      body:JSON.stringify({email:who.email,password:APP_PW})});
+      body:JSON.stringify({email:who.email,password:$('lpw').value})});
     const d=await r.json();
     if(!r.ok)throw new Error(d.error_description||d.msg||'Could not open the tracker');
     SESSION=d;save();
@@ -559,8 +580,9 @@ $('lgo').onclick=async()=>{
     await loadAll();
     if(!ME)throw new Error('That name is not on this tracker yet.');
     start();
-  }catch(e){err.textContent=e.message;b.disabled=false;b.textContent='Continue';}
+  }catch(e){err.textContent=e.message;b.disabled=false;b.textContent='Sign in';}
 };
+$('lpw').addEventListener('keydown',e=>{if(e.key==='Enter')$('lgo').click();});
 $('out').onclick=()=>{try{localStorage.removeItem('eng-session');}catch(e){}location.reload();};
 
 (async()=>{
