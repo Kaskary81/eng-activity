@@ -269,6 +269,81 @@ table.daily tr.td-today td{background:var(--chip)}
 .hrow i{margin-left:auto;color:var(--ink3);font-style:normal;font-size:11px}
 .hrow .hx{color:var(--ink3);opacity:.6;font-size:12px}
 .hrow .hx:hover{color:#fda4af;opacity:1}
+
+/* ---------- desktop top bar ---------- */
+#topbar{display:flex;align-items:center;gap:6px;padding:9px 18px;flex:none;
+  background:linear-gradient(180deg,rgba(30,21,54,.96),rgba(18,12,34,.92));
+  border-bottom:1px solid rgba(168,85,247,.16);backdrop-filter:blur(12px)}
+#topbar .mark{width:30px;height:30px;border-radius:9px}
+#topbar .title{font-size:14.5px;font-weight:700;letter-spacing:-.01em;margin-right:10px}
+#topbar .title small{display:block;font-size:9.5px;font-weight:700;letter-spacing:.09em;
+  text-transform:uppercase;color:var(--ink3)}
+.tbbtn{padding:7px 13px;border-radius:10px;font-size:13px;font-weight:650;color:var(--ink2);
+  transition:.18s var(--ease);position:relative}
+.tbbtn:hover{background:var(--chip);color:var(--ink)}
+.tbbtn.on{color:#e9d5ff;background:linear-gradient(180deg,rgba(168,85,247,.2),transparent)}
+.tbbtn.on:after{content:"";position:absolute;left:12px;right:12px;bottom:2px;height:2px;
+  border-radius:2px;background:var(--violet);box-shadow:0 0 10px var(--violet)}
+.crumb{font-size:11px;font-weight:700;letter-spacing:.11em;text-transform:uppercase;
+  color:var(--ink3);padding:12px 0 2px}
+
+/* ---------- cards used by Plan, Overdue and More ---------- */
+.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:10px;padding:4px 0}
+.lcard{background:var(--card);border:1px solid var(--line);border-left:3px solid var(--line2);
+  border-radius:13px;padding:12px 14px;cursor:pointer;animation:rise .4s var(--ease) both;
+  transition:transform .2s var(--ease),border-color .2s,box-shadow .2s}
+.lcard:hover{transform:translateY(-2px);border-color:var(--line2);box-shadow:var(--shadow)}
+.lcard.ok{border-left-color:var(--good)} .lcard.bad{border-left-color:var(--hot)}
+.lc-top{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.lc-top b{font-size:13.5px;font-family:var(--mono);color:var(--ink)}
+.tagk{font-size:9.5px;font-weight:750;letter-spacing:.07em;text-transform:uppercase;
+  color:var(--ink3);background:var(--chip);border-radius:20px;padding:2px 8px}
+.lc-top .late{margin-left:auto;color:var(--hot);font-size:11.5px;font-weight:700}
+.lc-top .ok{margin-left:auto;color:var(--good);font-size:11.5px;font-weight:700}
+.lc-top .due{margin-left:auto;color:var(--sky);font-size:11.5px;font-weight:700}
+.lc-what{font-size:13px;color:var(--ink2);margin-top:6px;line-height:1.45}
+.lc-meta{font-size:11.5px;color:var(--ink3);margin-top:6px}
+
+/* ---------- plan ---------- */
+.planbar{display:flex;align-items:center;gap:9px;padding:4px 0 12px}
+.planbar .wk{text-align:center;min-width:170px}
+.planbar .wk b{display:block;font-size:14px}
+.planbar .wk span{font-size:11px;color:var(--ink3)}
+.planprog{background:linear-gradient(180deg,rgba(38,27,68,.75),rgba(24,17,44,.75));
+  border:1px solid rgba(168,85,247,.16);border-radius:14px;padding:14px 16px;margin-bottom:12px}
+.pnum{display:flex;align-items:baseline;gap:10px}
+.pnum b{font-size:26px;letter-spacing:-.02em}
+.pnum span{color:var(--ink3);font-size:12.5px}
+.ptrack{height:7px;border-radius:5px;background:var(--chip);margin:10px 0 8px;overflow:hidden}
+.ptrack i{display:block;height:100%;border-radius:5px;
+  background:linear-gradient(90deg,var(--violet),var(--good));transition:width .8s var(--ease)}
+.pleg{display:flex;gap:14px;font-size:11px;font-weight:700;letter-spacing:.05em;text-transform:uppercase}
+.pleg .g{color:var(--good)} .pleg .r{color:var(--hot)} .pleg .n{color:var(--ink3)}
+
+/* ---------- phone tab bar ---------- */
+#mtabs{display:none;position:fixed;left:0;right:0;bottom:0;z-index:70;
+  background:rgba(20,14,38,.95);backdrop-filter:blur(16px);
+  border-top:1px solid rgba(168,85,247,.16);padding-bottom:var(--safe-b)}
+#mtabs button{flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;
+  padding:8px 2px 9px;font-size:9.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;
+  color:var(--ink3);position:relative;transition:color .15s}
+#mtabs button svg{width:19px;height:19px;stroke:currentColor;fill:none;stroke-width:1.7;
+  stroke-linecap:round;stroke-linejoin:round;transition:transform .25s var(--spring)}
+#mtabs button.on{color:var(--violet)}
+#mtabs button.on svg{transform:translateY(-2px) scale(1.1)}
+#mtabs button.on:before{content:"";position:absolute;top:0;left:50%;transform:translateX(-50%);
+  width:26px;height:2px;background:var(--violet);border-radius:0 0 2px 2px;box-shadow:0 0 10px var(--violet)}
+#mtabs .badge{position:absolute;top:4px;right:calc(50% - 20px);background:var(--hot);color:#fff;
+  font-style:normal;font-size:9px;border-radius:9px;padding:0 5px;line-height:14px}
+
+@media (max-width:760px){
+  #mtabs{display:flex}
+  #topbar [data-view]{display:none}
+  #topbar{padding:9px 14px}
+  .cards{grid-template-columns:1fr}
+  .wrap{padding-bottom:calc(84px + var(--safe-b))}
+  .planbar .wk{min-width:0;flex:1}
+}
 </style>
 </head>
 <body>
@@ -285,32 +360,38 @@ table.daily tr.td-today td{background:var(--chip)}
 </div>
 
 <div id="app">
+  <div id="topbar">
+    <div class="mark"></div>
+    <div class="title">Engineering Activity<small id="sub">tracker</small></div>
+    <button class="tbbtn" data-view="reg">▦ Register</button>
+    <button class="tbbtn" data-view="plan">▤ Plan</button>
+    <button class="tbbtn" data-view="dash">◔ Dashboard</button>
+    <button class="tbbtn" data-view="late">◷ Overdue</button>
+    <div class="grow"></div>
+    <span class="who" id="who"></span>
+    <button class="iconb" id="out" title="Sign out">⎋</button>
+  </div>
   <header>
-    <div class="top">
-      <div class="mark"></div>
-      <h1>Engineering Activity<small id="sub">tracker</small></h1>
-      <div class="grow"></div>
-      <span class="who" id="who"></span>
-      <button class="iconb" id="out" title="Sign out">⎋</button>
-    </div>
     <div class="rail" id="rail"></div>
     <div class="tabs" id="tabs"></div>
+    <div class="crumb" id="crumb"></div>
     <div class="kpis" id="kpis"></div>
     <div class="tools" id="tools"></div>
   </header>
   <div class="wrap" id="wrap"></div>
 </div>
+<nav id="mtabs"></nav>
 <div class="sheet" id="sheet"></div>
 <div id="toast"></div>
 
 <script>
 const SB_URL='https://ivmmnsjiekhjxkhllncb.supabase.co';
 const SB_KEY='sb_publishable_RTHsaxZXVmRBQziLbFJX8g_PAaZzIbF';
-const BUILD='ENG 2026-08-19 · e6';
+const BUILD='ENG 2026-08-21 · e7';
 
 let SESSION=null, ME=null;
 let PROJECTS=[], PEOPLE=[], AB=[], SD=[], GIS=[], ISSUES=[], HIST=[];
-let PROJ=null, TAB='asbuilts', Q='', F='', SORT={k:'submittal_no',dir:1};
+let PROJ=null, TAB='shop', Q='', F='', SORT={k:'submittal_no',dir:1};
 
 const isoDay=d=>{const x=(d instanceof Date)?d:new Date(d);
   return x.getFullYear()+'-'+String(x.getMonth()+1).padStart(2,'0')+'-'+
@@ -396,7 +477,6 @@ const TABS=[
   {k:'shop',    t:'Shop Drawings',n:()=>sdFor().length},
   {k:'gis',     t:'GIS',       n:()=>gisFor().length},
   {k:'issues',  t:'Issues',    n:()=>issFor().length},
-  {k:'overview',t:'Overview',  n:()=>0}
 ];
 const COLS={
   asbuilts:[
@@ -622,7 +702,7 @@ let DAYS_BACK=14;
 function dailyPanel(){
   const cols=DATECOLS[TAB]||DATECOLS.shop;
   const rows=[];
-  const src = TAB==='overview' ? sdFor() : rowsOf(TAB);
+  const src = (VIEW==='dash') ? sdFor() : rowsOf(TAB);
   const subK = TAB==='issues'?'identified_date':'submitted_date';
   const recK = TAB==='issues'?'closed_date':'received_date';
   for(let i=0;i<DAYS_BACK;i++){
@@ -736,6 +816,145 @@ async function reloadRecord(kind,id){
   paint(); openSheet(id);
 }
 
+
+/* ============================================================
+   Navigation — Register · Plan · Dashboard · Overdue, the same
+   shape as the snag and LOD trackers: a bar on top, tabs at the
+   bottom of the phone.
+   ============================================================ */
+let VIEW='reg';
+const ICON={
+  dash:'<path d="M3 12h4l3-8 4 16 3-8h4"/>',
+  reg :'<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 9v12"/>',
+  plan:'<rect x="3" y="4" width="18" height="17" rx="2"/><path d="M8 2v4M16 2v4M3 10h18M9 15l2 2 4-4"/>',
+  late:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+  more:'<circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/>'};
+const VIEWLABEL={reg:'Register',plan:'Plan',dash:'Dashboard',late:'Overdue',more:'More'};
+
+function goView(v){
+  VIEW=v;
+  if(v==='reg'&&TAB==='overview')TAB='shop';
+  paint();
+  const wrap=$('wrap'); if(wrap)wrap.scrollTop=0;
+}
+function paintNav(){
+  document.querySelectorAll('#topbar [data-view]').forEach(b=>{
+    b.classList.toggle('on', b.dataset.view===VIEW);
+    b.onclick=()=>goView(b.dataset.view);});
+  const tabs=[['dash','Overview'],['reg','Register'],['plan','Plan'],['late','Overdue'],['more','More']];
+  $('mtabs').innerHTML=tabs.map(([v,l])=>{
+    const n = v==='late'?overdueRows().length : 0;
+    return `<button class="${VIEW===v?'on':''}" data-mt="${v}">
+      <svg viewBox="0 0 24 24">${ICON[v]}</svg>${l}
+      ${n?`<i class="badge">${n>99?'99+':n}</i>`:''}</button>`;}).join('');
+  $('mtabs').querySelectorAll('[data-mt]').forEach(b=>b.onclick=()=>goView(b.dataset.mt));
+}
+
+/* everything open and past its date */
+function overdueRows(){
+  const out=[];
+  sdFor().forEach(r=>{ if(!GIS_OK(r.review_status)&&r.planned_date&&r.planned_date<today&&!r.submitted_date)
+    out.push({kind:'Shop drawing',ref:r.submittal_no||r.description,what:r.description,
+      due:r.planned_date,state:r.review_status,id:r.id,tab:'shop'});});
+  gisFor().forEach(r=>{ if(!GIS_OK(r.review_status)&&r.planned_date&&r.planned_date<today&&!r.submitted_date)
+    out.push({kind:'GIS',ref:r.description,what:r.description,
+      due:r.planned_date,state:r.review_status,id:r.id,tab:'gis'});});
+  issFor().forEach(r=>{ if(ISS_OPEN(r.status)&&r.target_date&&r.target_date<today)
+    out.push({kind:'Issue',ref:r.issue_id,what:r.description,
+      due:r.target_date,state:r.status,id:r.id,tab:'issues'});});
+  return out.sort((a,b)=>a.due<b.due?-1:1);
+}
+const daysLate=d=>Math.round((new Date(today)-new Date(d))/864e5);
+function paintOverdue(){
+  const rows=overdueRows();
+  if(!rows.length){ $('wrap').innerHTML=`<div class="empty"><div class="big">✅</div>
+    <b>Nothing is overdue</b>Every planned submission and open issue is still within its date.</div>`;
+    return; }
+  $('wrap').innerHTML=`<div class="cards">${rows.map((r,i)=>`
+    <article class="lcard" data-go="${r.tab}:${r.id}" style="animation-delay:${Math.min(i,14)*24}ms">
+      <div class="lc-top"><span class="tagk">${esc(r.kind)}</span>
+        <b>${esc(r.ref||'—')}</b>
+        <span class="late">${daysLate(r.due)}d late</span></div>
+      <div class="lc-what">${esc(r.what||'')}</div>
+      <div class="lc-meta">Due ${esc(r.due)} · ${esc(r.state)}</div>
+    </article>`).join('')}</div>`;
+  $('wrap').querySelectorAll('[data-go]').forEach(el=>el.onclick=()=>{
+    const [tab,id]=el.dataset.go.split(':');
+    TAB=tab; VIEW='reg'; paint(); openSheet(+id);});
+}
+
+/* ---------- Plan: what is meant to go out, week by week ---------- */
+let WEEK=0;
+function weekStart(off){
+  const d=new Date(today+'T00:00:00');
+  d.setDate(d.getDate()-((d.getDay()+1)%7)+off*7);   /* weeks run Sunday to Saturday */
+  return isoDay(d);
+}
+function paintPlan(){
+  const from=weekStart(WEEK), to=(()=>{const d=new Date(from+'T00:00:00');
+    d.setDate(d.getDate()+6);return isoDay(d);})();
+  const inWeek=r=>r.planned_date>=from&&r.planned_date<=to;
+  const items=[...sdFor().filter(r=>r.planned_date&&inWeek(r)).map(r=>({...r,kind:'Shop drawing',tab:'shop'})),
+               ...gisFor().filter(r=>r.planned_date&&inWeek(r)).map(r=>({...r,kind:'GIS',tab:'gis'}))]
+    .sort((a,b)=>a.planned_date<b.planned_date?-1:1);
+  const done=items.filter(r=>r.submitted_date&&r.submitted_date<=to).length;
+  const late=items.filter(r=>!r.submitted_date&&r.planned_date<today).length;
+  const pct=items.length?Math.round(done/items.length*100):0;
+  const fmt=d=>new Date(d+'T00:00:00').toLocaleDateString('en-GB',{day:'numeric',month:'short'});
+  $('wrap').innerHTML=`
+    <div class="planbar">
+      <button class="btn" id="wprev">‹</button>
+      <div class="wk"><b>${fmt(from)} – ${fmt(to)}</b>
+        <span>${WEEK===0?'this week':WEEK===1?'next week':WEEK===-1?'last week'
+          :(WEEK>0?WEEK+' weeks ahead':(-WEEK)+' weeks back')}</span></div>
+      <button class="btn" id="wnext">›</button>
+      <button class="btn" id="wnow">Today</button>
+    </div>
+    <div class="planprog"><div class="pnum"><b>${pct}%</b>
+        <span>${done} of ${items.length} sent</span></div>
+      <div class="ptrack"><i style="width:${pct}%"></i></div>
+      <div class="pleg"><span class="g">${done} sent</span>
+        <span class="r">${late} overdue</span>
+        <span class="n">${items.length-done-late} still to come</span></div></div>
+    ${items.length?`<div class="cards">${items.map((r,i)=>{
+      const sent=!!r.submitted_date, isLate=!sent&&r.planned_date<today;
+      return `<article class="lcard ${sent?'ok':isLate?'bad':''}" data-go="${r.tab}:${r.id}"
+          style="animation-delay:${Math.min(i,14)*24}ms">
+        <div class="lc-top"><span class="tagk">${esc(r.kind)}</span>
+          <b>${esc(r.submittal_no||r.description)}</b>
+          <span class="${sent?'ok':isLate?'late':'due'}">${
+            sent?'sent '+esc(r.submitted_date):isLate?daysLate(r.planned_date)+'d late':'due '+esc(r.planned_date)}</span></div>
+        <div class="lc-what">${esc(r.description||'')}</div>
+        <div class="lc-meta">${esc(projName(r.project_id))} · ${esc(r.review_status)}</div>
+      </article>`;}).join('')}</div>`
+    :`<div class="empty"><div class="big">📅</div><b>Nothing planned for this week</b>
+      Planned dates come from the drawings themselves — set one and it appears here.</div>`}`;
+  $('wprev').onclick=()=>{WEEK--;paintPlan();};
+  $('wnext').onclick=()=>{WEEK++;paintPlan();};
+  $('wnow').onclick=()=>{WEEK=0;paintPlan();};
+  $('wrap').querySelectorAll('[data-go]').forEach(el=>el.onclick=()=>{
+    const [tab,id]=el.dataset.go.split(':');
+    TAB=tab; VIEW='reg'; paint(); openSheet(+id);});
+}
+
+/* ---------- More (phone) ---------- */
+function paintMore(){
+  $('wrap').innerHTML=`<div class="cards">
+    ${[['reg','Register','Browse and edit every record'],
+       ['plan','Plan','What is due to go out, week by week'],
+       ['dash','Dashboard','Totals, breakdowns and day by day'],
+       ['late','Overdue','Everything past its date']].map(([v,t,d])=>
+      `<article class="lcard" data-mv="${v}"><div class="lc-top"><b>${t}</b></div>
+        <div class="lc-meta">${d}</div></article>`).join('')}
+    <article class="lcard"><div class="lc-top"><b>Signed in</b></div>
+      <div class="lc-meta">${esc((ME&&ME.name)||'')} · ${esc((ME&&ME.role)||'')}</div></article>
+    <article class="lcard" id="mout"><div class="lc-top"><b>Sign out</b></div></article>
+    <article class="lcard"><div class="lc-meta">${esc(BUILD)}</div></article>
+  </div>`;
+  $('wrap').querySelectorAll('[data-mv]').forEach(el=>el.onclick=()=>goView(el.dataset.mv));
+  $('mout').onclick=()=>{try{localStorage.removeItem('eng-session');}catch(e){}location.reload();};
+}
+
 /* ---------- painting ---------- */
 function paintRail(){
   const all=AB.length+SD.length+GIS.length+ISSUES.length;
@@ -789,7 +1008,7 @@ function paintKpis(){
       isOpen?late/isOpen*100:0);
 }
 function paintTools(){
-  if(TAB==='overview'){ $('tools').innerHTML=''; return; }
+
   const F1 = TAB==='issues' ? [['','Everything'],['open','Open'],['done','Resolved'],['late','Past target']]
            : (TAB==='gis'||TAB==='shop') ? [['','Everything'],['open','Not approved'],['done','Approved']]
                             : [['','Everything'],['open','Not submitted'],['done','Submitted']];
@@ -809,7 +1028,7 @@ function paintTools(){
   $('dates').onclick=openDateFilter;
 }
 function paintTable(){
-  if(TAB==='overview'){ paintOverview(); return; }
+
   const cols=COLS[TAB], rows=rowsNow();
   if($('count'))$('count').textContent=rows.length+' of '+
     (TAB==='gis'?gisFor().length:TAB==='issues'?issFor().length
@@ -879,7 +1098,19 @@ function wireDaily(){
     DAYS_BACK=+b.dataset.days; paintTable();});
 }
 function paint(){
-  paintRail();paintTabs();paintKpis();paintTools();paintTable();
+  paintNav();
+  paintRail();
+  const onReg = VIEW==='reg';
+  $('tabs').style.display  = onReg?'':'none';
+  $('tools').style.display = onReg?'':'none';
+  $('kpis').style.display  = (VIEW==='dash')?'':'none';
+  $('crumb').textContent   = onReg?'':VIEWLABEL[VIEW]||'';
+  $('crumb').style.display = onReg?'none':'';
+  if(onReg){ paintTabs(); paintKpis(); paintTools(); paintTable(); }
+  else if(VIEW==='dash'){ paintKpis(); paintOverview(); }
+  else if(VIEW==='plan'){ paintPlan(); }
+  else if(VIEW==='late'){ paintOverdue(); }
+  else { paintMore(); }
   $('sub').textContent = PROJ ? (projCode(PROJ)||projName(PROJ)) : 'all projects';
 }
 
@@ -901,7 +1132,7 @@ function start(){
   $('login').classList.remove('on');
   $('app').classList.add('on');
   $('who').textContent=(ME&&ME.name)||((SESSION.user&&SESSION.user.email)||'').split('@')[0];
-  SORT={k:COLS.asbuilts[0].k,dir:1};
+  SORT={k:COLS[TAB][0].k,dir:1};
   paint();
 }
 /* Names come from the directory; each carries the sign-in address this app
