@@ -218,7 +218,7 @@ td.wrapc{white-space:normal;line-height:1.45;unicode-bidi:plaintext}
 <script>
 const SB_URL='https://ivmmnsjiekhjxkhllncb.supabase.co';
 const SB_KEY='sb_publishable_RTHsaxZXVmRBQziLbFJX8g_PAaZzIbF';
-const BUILD='ENG 2026-08-18 · e3';
+const BUILD='ENG 2026-08-18 · e4';
 
 let SESSION=null, ME=null;
 let PROJECTS=[], PEOPLE=[], AB=[], SD=[], GIS=[], ISSUES=[];
@@ -312,7 +312,9 @@ const TABS=[
 const COLS={
   asbuilts:[
     {k:'submittal_no',t:'Submittal',w:170,cls:'mono'},
+    {k:'description', t:'Drawing',   w:330,wrap:1},
     {k:'discipline',  t:'Discipline',w:130},
+    {k:'revision',    t:'Rev',       w:60},
     {k:'status',      t:'Status',   w:120,pill:1},
     {k:'category',    t:'Category', w:150},
     {k:'zone',        t:'Zone',     w:90},
@@ -322,7 +324,7 @@ const COLS={
     {k:'length_2d',   t:'Length m', w:90},
     {k:'method',      t:'Method',   w:140},
     {k:'invoice_no',  t:'Invoice',  w:80},
-    {k:'comments',    t:'Comments', w:280,wrap:1},
+
     {k:'project_id',  t:'Project',  w:150,calc:r=>projName(r.project_id)}
   ],
   shop:[
