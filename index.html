@@ -71,10 +71,10 @@ h1 small{display:block;font-size:10.5px;font-weight:700;letter-spacing:.1em;
 .pj:hover{border-color:var(--line2);transform:translateY(-2px)}
 .pj.on{border-color:var(--violet);background:linear-gradient(180deg,rgba(168,85,247,.16),transparent);
   box-shadow:0 0 0 3px rgba(168,85,247,.14)}
-.pj b{display:block;font-size:13.5px}
+.pj b{display:flex;align-items:baseline;gap:6px;font-size:13.5px;white-space:nowrap}
 .pj span{font-size:10.5px;color:var(--ink3);font-variant-numeric:tabular-nums}
-.pj .code{position:absolute;top:8px;right:10px;font-size:9.5px;font-weight:800;color:var(--violet);
-  letter-spacing:.06em}
+.pj .code{font-style:normal;font-size:9.5px;font-weight:800;color:var(--violet);letter-spacing:.06em;
+  background:rgba(168,85,247,.14);border-radius:20px;padding:1px 6px;flex:none}
 
 /* tabs */
 .tabs{display:flex;gap:4px;margin-top:12px;border-bottom:1px solid var(--line)}
@@ -387,7 +387,7 @@ table.daily tr.td-today td{background:var(--chip)}
 <script>
 const SB_URL='https://ivmmnsjiekhjxkhllncb.supabase.co';
 const SB_KEY='sb_publishable_RTHsaxZXVmRBQziLbFJX8g_PAaZzIbF';
-const BUILD='ENG 2026-08-21 · e7';
+const BUILD='ENG 2026-08-21 · e8';
 
 let SESSION=null, ME=null;
 let PROJECTS=[], PEOPLE=[], AB=[], SD=[], GIS=[], ISSUES=[], HIST=[];
@@ -966,9 +966,9 @@ function paintRail(){
              +SD.filter(r=>r.project_id===p.id).length
              +GIS.filter(r=>r.project_id===p.id).length
              +ISSUES.filter(r=>r.project_id===p.id).length;
-      return `<button class="pj ${PROJ===p.id?'on':''}" data-p="${p.id}">
-        ${p.code?`<span class="code">${esc(p.code)}</span>`:''}
-        <b>${esc(p.name)}</b><span>${n} record${n===1?'':'s'}</span></button>`;}).join('');
+      return `<button class="pj ${PROJ===p.id?'on':''}" data-p="${p.id}" title="${esc(p.name)}">
+        <b>${esc(p.name)}${p.code?`<i class="code">${esc(p.code)}</i>`:''}</b>
+        <span>${n} record${n===1?'':'s'}</span></button>`;}).join('');
   $('rail').querySelectorAll('[data-p]').forEach(b=>b.onclick=()=>{
     PROJ=b.dataset.p?+b.dataset.p:null; paint(); });
 }
