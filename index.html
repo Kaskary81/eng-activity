@@ -145,11 +145,12 @@ td.wrapc{white-space:normal;line-height:1.45;unicode-bidi:plaintext}
   border:1px solid rgba(168,85,247,.14);border-radius:15px;padding:15px 17px}
 .panel h3{margin:0 0 12px;font-size:10.5px;font-weight:750;letter-spacing:.1em;
   text-transform:uppercase;color:#c4b5fd}
-.brow{display:grid;grid-template-columns:118px 1fr 46px;gap:10px;align-items:center;margin-bottom:8px}
+.brow{display:grid;grid-template-columns:118px 1fr 62px;gap:10px;align-items:center;margin-bottom:8px}
 .blab{font-size:12px;color:var(--ink2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .btrack{height:9px;border-radius:6px;background:var(--chip);overflow:hidden;display:flex}
 .btrack i{display:block;height:100%;transition:flex .7s var(--ease);cursor:pointer}
 .bnum{font-size:11.5px;color:var(--ink3);text-align:right;font-variant-numeric:tabular-nums}
+.bnum b{color:var(--good);font-weight:700}
 .legend{display:flex;gap:14px;flex-wrap:wrap;margin-top:10px;font-size:10px;font-weight:700;
   letter-spacing:.05em;text-transform:uppercase;color:var(--ink3)}
 .legend span{display:inline-flex;align-items:center;gap:6px}
@@ -387,7 +388,7 @@ table.daily tr.td-today td{background:var(--chip)}
 <script>
 const SB_URL='https://ivmmnsjiekhjxkhllncb.supabase.co';
 const SB_KEY='sb_publishable_RTHsaxZXVmRBQziLbFJX8g_PAaZzIbF';
-const BUILD='ENG 2026-08-21 · e9';
+const BUILD='ENG 2026-08-22 · e10';
 
 let SESSION=null, ME=null;
 let PROJECTS=[], PEOPLE=[], AB=[], SD=[], GIS=[], ISSUES=[], HIST=[], INV=[];
@@ -434,18 +435,35 @@ async function resume(){
 function toast(m){const t=$('toast');t.textContent=m;t.classList.add('on');
   clearTimeout(t._x);t._x=setTimeout(()=>t.classList.remove('on'),3000);}
 
+/* The database returns at most 1000 rows per request whatever limit is asked
+   for, so anything that can grow past that must be fetched page by page —
+   otherwise the register quietly shows part of the data and looks correct. */
+const PAGE=1000;
+async function apiAll(path){
+  let out=[], from=0;
+  for(let guard=0; guard<40; guard++){
+    const part=await api(path,{headers:{Range:from+'-'+(from+PAGE-1),
+      'Range-Unit':'items',Prefer:'count=none'}});
+    const got=part||[];
+    out=out.concat(got);
+    if(got.length<PAGE)break;
+    from+=PAGE;
+  }
+  return out;
+}
+
 /* ---------- loading ---------- */
 async function loadAll(){
   const [pr,pe,ab,sd,gi,is,me,hs,iv]=await Promise.all([
     api('eng_projects?order=seq.asc'),
     api('eng_people?order=name.asc'),
-    api('eng_asbuilts?deleted_at=is.null&order=id.asc&limit=5000'),
-    api('eng_shopdrawings?deleted_at=is.null&order=id.asc&limit=2000'),
-    api('eng_gis?deleted_at=is.null&order=id.asc&limit=2000'),
-    api('eng_issues?deleted_at=is.null&order=id.asc&limit=2000'),
+    apiAll('eng_asbuilts?deleted_at=is.null&order=id.asc'),
+    apiAll('eng_shopdrawings?deleted_at=is.null&order=id.asc'),
+    apiAll('eng_gis?deleted_at=is.null&order=id.asc'),
+    apiAll('eng_issues?deleted_at=is.null&order=id.asc'),
     api('eng_members?select=name,role&limit=1'),
-    api('eng_history?order=id.asc&limit=5000'),
-    api('eng_invoice_sections?deleted_at=is.null&order=id.asc&limit=5000')]);
+    apiAll('eng_history?order=id.asc'),
+    apiAll('eng_invoice_sections?deleted_at=is.null&order=id.asc')]);
   PROJECTS=pr||[];PEOPLE=pe||[];AB=ab||[];SD=sd||[];GIS=gi||[];ISSUES=is||[];
   ME=(me&&me[0])||null; HIST=hs||[]; INV=iv||[];
 }
@@ -1099,9 +1117,11 @@ function bars(title,groups,colFor){
       <div class="btrack" style="width:${g.total/max*100}%">
         <i style="flex:${g.done};background:var(--good)"></i>
         <i style="flex:${g.total-g.done};background:${colFor||'var(--hot)'}"></i></div>
-      <div class="bnum">${g.total-g.done}</div></div>`).join('')}
+      <div class="bnum"><b>${g.done}</b>/${g.total}</div></div>`).join('')}
     <div class="legend"><span><i style="background:var(--good)"></i>done</span>
-      <span><i style="background:${colFor||'var(--hot)'}"></i>outstanding</span></div></div>`;
+      <span><i style="background:${colFor||'var(--hot)'}"></i>outstanding</span>
+      <span style="margin-left:auto;text-transform:none;letter-spacing:0">done / total</span>
+      </div></div>`;
 }
 function group(rows,keyFn,doneFn){
   const m={};
@@ -1121,8 +1141,9 @@ function paintOverview(){
     ${bars('GIS by project', group(gi,r=>projName(r.project_id),r=>GIS_OK(r.review_status)))}
     ${bars('As-builts by category', group(ab,r=>r.category,r=>AB_DONE(r.status)))}
     ${dailyPanel()}
-    ${bars('Sections by invoice', group(invFor(),r=>r.invoice_no?'Invoice '+r.invoice_no:'(no invoice)',
-        r=>r.status==='Submitted'),'var(--sky)')}
+    ${bars('Sections by invoice',
+        group(invFor(),r=>r.invoice_no?'Invoice '+r.invoice_no:'(no invoice)',
+          r=>r.status==='Submitted').sort((a,b)=>a.k.localeCompare(b.k)),'var(--sky)')}
     ${bars('Issues by target month', group(is.filter(r=>r.identified_date),
         r=>r.identified_date.slice(0,7),r=>!ISS_OPEN(r.status)),'var(--warn)')}
   </div>`;
