@@ -357,6 +357,18 @@ table.daily tr.td-today td{background:var(--chip)}
   box-shadow:0 12px 30px rgba(124,58,237,.55);transition:.25s var(--spring)}
 #fab:active{transform:scale(.92)}
 @media (min-width:761px){#fab{display:none!important}}
+
+.panel.live h3{display:flex;align-items:center;gap:8px}
+.hintclick{margin-left:auto;font-size:9px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;
+  color:var(--ink3);border:1px solid var(--line2);border-radius:20px;padding:1px 8px}
+.panel.live .blab:hover,.panel.live .bnum:hover{color:#e9d5ff;text-decoration:underline}
+.panel.live .btrack{cursor:pointer}
+.panel.live .btrack i:hover{filter:brightness(1.4)}
+.kpi.live{cursor:pointer;transition:transform .2s var(--ease),border-color .2s,box-shadow .2s}
+.kpi.live:hover{transform:translateY(-3px);border-color:rgba(168,85,247,.45);
+  box-shadow:0 14px 34px rgba(88,28,135,.4)}
+.btn.drillchip{background:linear-gradient(180deg,rgba(168,85,247,.28),rgba(124,58,237,.18));
+  border-color:var(--violet);color:#e9d5ff}
 </style>
 </head>
 <body>
@@ -401,7 +413,7 @@ table.daily tr.td-today td{background:var(--chip)}
 <script>
 const SB_URL='https://ivmmnsjiekhjxkhllncb.supabase.co';
 const SB_KEY='sb_publishable_RTHsaxZXVmRBQziLbFJX8g_PAaZzIbF';
-const BUILD='ENG 2026-08-22 · e12';
+const BUILD='ENG 2026-08-22 · e13';
 
 let SESSION=null, ME=null;
 let PROJECTS=[], PEOPLE=[], AB=[], SD=[], GIS=[], HIST=[], INV=[];
@@ -576,6 +588,7 @@ function rowsNow(){
          : TAB==='asbuilts' ? rows.filter(r=>AB_DONE(r.status))
          : rows.filter(r=>GIS_OK(r.review_status));
   }
+  if(DRILL&&DRILL.tab===TAB)rows=rows.filter(drillMatch);
   if(DF.field&&(DF.from||DF.to)){
     rows=rows.filter(r=>{const v=r[DF.field]||'';
       if(!v)return false;
@@ -633,6 +646,33 @@ const DATECOLS={asbuilts:[],shop:[['planned_date','Planned'],['submitted_date','
     ['received_date','Received']],
   gis:[['planned_date','Planned'],['submitted_date','Submitted'],['received_date','Received']]};
 let DF={field:'',from:'',to:''};
+/* set by clicking anything on the dashboard: which register, which field,
+   which value, and whether we want the finished or the outstanding part */
+let DRILL=null;
+const DONEFN={
+  shop:   r=>GIS_OK(r.review_status),
+  gis:    r=>GIS_OK(r.review_status),
+  asbuilts:r=>AB_DONE(r.status),
+  invoice:r=>r.status==='Submitted'};
+function drillMatch(r){
+  if(!DRILL)return true;
+  const f=DRILL.field;
+  const got = f==='project_id' ? r.project_id
+            : (r[f]===null||r[f]===undefined?'':r[f]);
+  if(String(got)!==String(DRILL.value))return false;
+  if(DRILL.state==='done')return DONEFN[DRILL.tab](r);
+  if(DRILL.state==='open')return !DONEFN[DRILL.tab](r);
+  return true;
+}
+function goDrill(tab,field,value,state,label){
+  DRILL={tab,field,value,state,label};
+  TAB=tab; VIEW='reg'; F=''; Q=''; DF={field:'',from:'',to:''};
+  paint();
+  const w=$('wrap'); if(w)w.scrollTop=0;
+  const n=rowsNow().length;
+  toast(n+' record'+(n===1?'':'s')+' · '+label);
+}
+function clearDrill(){ DRILL=null; paint(); }
 const canEdit=()=>ME&&(ME.role==='admin'||ME.role==='editor');
 
 function rowsOf(tab){ return tab==='gis'?gisFor()
@@ -1060,12 +1100,13 @@ function paintTabs(){
     `<button class="tab ${TAB===t.k?'on':''}" data-t="${t.k}">${t.t}${
       t.k!=='overview'?`<span class="n">${t.n()}</span>`:''}</button>`).join('');
   $('tabs').querySelectorAll('[data-t]').forEach(b=>b.onclick=()=>{
-    TAB=b.dataset.t; F=''; Q=''; DF={field:'',from:'',to:''};
+    TAB=b.dataset.t; F=''; Q=''; DF={field:'',from:'',to:''}; DRILL=null;
     SORT={k:(COLS[TAB]||[{k:'id'}])[0].k,dir:1};
     paint(); });
 }
-function tile(k,v,p,col,frac){
-  return `<div class="kpi"><div class="k">${k}</div><div class="v">${v}</div>
+function tile(k,v,p,col,frac,go){
+  return `<div class="kpi${go?' live':''}"${go?` data-kpi="${esc(go)}"`:''}>
+    <div class="k">${k}</div><div class="v">${v}</div>
     <div class="p">${p}</div>${frac==null?'':
       `<div class="bar"><i style="width:${Math.max(0,Math.min(100,frac))}%;background:${col}"></i></div>`}</div>`;
 }
@@ -1078,25 +1119,30 @@ function paintKpis(){
   const giOk=gi.filter(r=>GIS_OK(r.review_status)).length;
   $('kpis').innerHTML=
     tile('As-builts submitted', ab.length?Math.round(abDone/ab.length*100)+'%':'—',
-      abDone+' of '+ab.length,'var(--good)', ab.length?abDone/ab.length*100:0)+
+      abDone+' of '+ab.length,'var(--good)', ab.length?abDone/ab.length*100:0,
+      'asbuilts|done|Submitted as-builts')+
     tile('Not submitted', ab.length-abDone,'as-built drawings','var(--hot)',
-      ab.length?(ab.length-abDone)/ab.length*100:0)+
+      ab.length?(ab.length-abDone)/ab.length*100:0,'asbuilts|open|As-builts not submitted')+
     tile('Shop drawings approved', sdOk+' of '+sd.length,'submittals','var(--good)',
-      sd.length?sdOk/sd.length*100:0)+
+      sd.length?sdOk/sd.length*100:0,'shop|done|Approved shop drawings')+
+    tile('Shop drawings outstanding', sd.length-sdOk,'not yet approved','var(--warn)',
+      sd.length?(sd.length-sdOk)/sd.length*100:0,'shop|open|Shop drawings not approved')+
     tile('GIS approved', giOk+' of '+gi.length,'submittals','var(--good)',
-      gi.length?giOk/gi.length*100:0)+
+      gi.length?giOk/gi.length*100:0,'gis|done|Approved GIS submittals')+
     tile('Sections invoiced', inv.length?Math.round(invDone/inv.length*100)+'%':'—',
       invDone+' of '+inv.length+' · '+Math.round(invM).toLocaleString()+' m','var(--sky)',
-      inv.length?invDone/inv.length*100:0)+
+      inv.length?invDone/inv.length*100:0,'invoice|done|Invoiced sections')+
     tile('Sections not invoiced', inv.length-invDone,'of '+inv.length+' sections','var(--orange)',
-      inv.length?(inv.length-invDone)/inv.length*100:0);
+      inv.length?(inv.length-invDone)/inv.length*100:0,'invoice|open|Sections not invoiced');
 }
 function paintTools(){
 
   const F1 = TAB==='invoice' ? [['','Everything'],['open','Not submitted'],['done','Submitted']]
            : (TAB==='gis'||TAB==='shop') ? [['','Everything'],['open','Not approved'],['done','Approved']]
                             : [['','Everything'],['open','Not submitted'],['done','Submitted']];
-  $('tools').innerHTML=
+  const chip=(DRILL&&DRILL.tab===TAB)
+    ? `<button class="btn drillchip" id="cleardrill">${esc(DRILL.label)} ✕</button>`:'';
+  $('tools').innerHTML= chip +
     (canEdit()?`<button class="btn primary" id="newrec">+ New</button>`:'')+
     `<input class="f" id="q" placeholder="Search…" style="min-width:200px;flex:1;max-width:340px"
        value="${esc(Q)}">`+
@@ -1108,6 +1154,7 @@ function paintTools(){
      <span class="count" id="count"></span>`;
   $('q').oninput=e=>{Q=e.target.value;paintTable();};
   $('tools').querySelectorAll('[data-f]').forEach(b=>b.onclick=()=>{F=b.dataset.f;paint();});
+  if($('cleardrill'))$('cleardrill').onclick=clearDrill;
   if($('newrec'))$('newrec').onclick=newRecord;
   $('csv').onclick=exportCSV;
   $('pdf').onclick=exportPDF;
@@ -1143,43 +1190,77 @@ function paintTable(){
     SORT = SORT.k===k ? {k,dir:-SORT.dir} : {k,dir:1};
     paintTable();});
 }
-function bars(title,groups,colFor){
+function bars(title,groups,colFor,drill){
   const max=Math.max(1,...groups.map(g=>g.total));
   if(!groups.length)return `<div class="panel"><h3>${title}</h3>
     <div class="empty" style="padding:20px">Nothing yet.</div></div>`;
-  return `<div class="panel"><h3>${title}</h3>${groups.map(g=>`
-    <div class="brow"><div class="blab" title="${esc(g.k)}">${esc(g.k)}</div>
+  const at=(g,state)=>drill
+    ? ` data-drill="${esc(drill.tab)}|${esc(drill.field)}|${esc(String(g.raw))}|${state}|${esc(g.k)}"`
+    : '';
+  return `<div class="panel${drill?' live':''}"><h3>${title}${
+      drill?'<span class="hintclick">click to filter</span>':''}</h3>${groups.map(g=>`
+    <div class="brow"><div class="blab" title="${esc(g.k)}"${at(g,'all')}>${esc(g.k)}</div>
       <div class="btrack" style="width:${g.total/max*100}%">
-        <i style="flex:${g.done};background:var(--good)"></i>
-        <i style="flex:${g.total-g.done};background:${colFor||'var(--hot)'}"></i></div>
-      <div class="bnum"><b>${g.done}</b>/${g.total}</div></div>`).join('')}
+        <i style="flex:${g.done};background:var(--good)"${at(g,'done')} title="${g.done} done"></i>
+        <i style="flex:${g.total-g.done};background:${colFor||'var(--hot)'}"${at(g,'open')}
+           title="${g.total-g.done} outstanding"></i></div>
+      <div class="bnum"${at(g,'all')}><b>${g.done}</b>/${g.total}</div></div>`).join('')}
     <div class="legend"><span><i style="background:var(--good)"></i>done</span>
       <span><i style="background:${colFor||'var(--hot)'}"></i>outstanding</span>
       <span style="margin-left:auto;text-transform:none;letter-spacing:0">done / total</span>
       </div></div>`;
 }
-function group(rows,keyFn,doneFn){
+function group(rows,keyFn,doneFn,rawFn){
   const m={};
   rows.forEach(r=>{const k=keyFn(r)||'(not set)';
-    (m[k]=m[k]||{k,total:0,done:0});m[k].total++;if(doneFn(r))m[k].done++;});
+    (m[k]=m[k]||{k,total:0,done:0,raw:rawFn?rawFn(r):(keyFn(r)||'')});
+    m[k].total++;if(doneFn(r))m[k].done++;});
   return Object.values(m).sort((a,b)=>(b.total-b.done)-(a.total-a.done)||b.total-a.total);
 }
 function paintOverview(){
   /* drawn below, then wired */
   const ab=abFor(), gi=gisFor();
   $('wrap').innerHTML=`<div class="panels">
-    ${bars('As-builts by project', group(ab,r=>projName(r.project_id),r=>AB_DONE(r.status)))}
-    ${bars('As-builts by discipline', group(ab,r=>r.discipline,r=>AB_DONE(r.status)))}
-    ${bars('Shop drawings by project', group(sdFor(),r=>projName(r.project_id),r=>GIS_OK(r.review_status)))}
-    ${bars('Shop drawings by discipline', group(sdFor(),r=>r.discipline,r=>GIS_OK(r.review_status)))}
-    ${bars('GIS by project', group(gi,r=>projName(r.project_id),r=>GIS_OK(r.review_status)))}
-    ${bars('As-builts by category', group(ab,r=>r.category,r=>AB_DONE(r.status)))}
+    ${bars('As-builts by project', group(ab,r=>projName(r.project_id),r=>AB_DONE(r.status),
+        r=>r.project_id),'var(--hot)',{tab:'asbuilts',field:'project_id'})}
+    ${bars('As-builts by discipline', group(ab,r=>r.discipline,r=>AB_DONE(r.status)),
+        'var(--hot)',{tab:'asbuilts',field:'discipline'})}
+    ${bars('Shop drawings by project', group(sdFor(),r=>projName(r.project_id),
+        r=>GIS_OK(r.review_status),r=>r.project_id),'var(--hot)',{tab:'shop',field:'project_id'})}
+    ${bars('Shop drawings by review status', group(sdFor(),r=>r.review_status,
+        r=>GIS_OK(r.review_status),r=>r.review_status),'var(--warn)',{tab:'shop',field:'review_status'})}
+    ${bars('Shop drawings by zone', group(sdFor(),r=>r.zone,r=>GIS_OK(r.review_status),
+        r=>r.zone),'var(--hot)',{tab:'shop',field:'zone'})}
+    ${bars('GIS by project', group(gi,r=>projName(r.project_id),r=>GIS_OK(r.review_status),
+        r=>r.project_id),'var(--hot)',{tab:'gis',field:'project_id'})}
+    ${bars('As-builts by category', group(ab,r=>r.category,r=>AB_DONE(r.status),r=>r.category),
+        'var(--hot)',{tab:'asbuilts',field:'category'})}
     ${dailyPanel()}
     ${bars('Sections by invoice',
         group(invFor(),r=>r.invoice_no?'Invoice '+r.invoice_no:'(no invoice)',
-          r=>r.status==='Submitted').sort((a,b)=>a.k.localeCompare(b.k)),'var(--sky)')}
+          r=>r.status==='Submitted',r=>r.invoice_no).sort((a,b)=>a.k.localeCompare(b.k)),
+        'var(--sky)',{tab:'invoice',field:'invoice_no'})}
+    ${bars('Sections by method', group(invFor(),r=>r.method,r=>r.status==='Submitted',r=>r.method),
+        'var(--sky)',{tab:'invoice',field:'method'})}
   </div>`;
   wireDaily();
+}
+function wireDash(){
+  document.querySelectorAll('[data-drill]').forEach(el=>{
+    el.style.cursor='pointer';
+    el.onclick=e=>{e.stopPropagation();
+      const [tab,field,value,state,label]=el.dataset.drill.split('|');
+      goDrill(tab,field,value,state,
+        label+(state==='done'?' · done':state==='open'?' · outstanding':''));};});
+  document.querySelectorAll('[data-kpi]').forEach(el=>{
+    el.style.cursor='pointer';
+    el.onclick=()=>{
+      const [tab,state,label]=el.dataset.kpi.split('|');
+      DRILL=null; TAB=tab; VIEW='reg'; F=(state==='done'?'done':'open'); Q='';
+      DF={field:'',from:'',to:''};
+      paint();
+      const w=$('wrap'); if(w)w.scrollTop=0;
+      toast(rowsNow().length+' · '+label);};});
 }
 function wireDaily(){
   document.querySelectorAll('[data-days]').forEach(b=>b.onclick=()=>{
@@ -1197,7 +1278,7 @@ function paint(){
   $('crumb').textContent   = onReg?'':VIEWLABEL[VIEW]||'';
   $('crumb').style.display = onReg?'none':'';
   if(onReg){ paintTabs(); paintKpis(); paintTools(); paintTable(); }
-  else if(VIEW==='dash'){ paintKpis(); paintOverview(); }
+  else if(VIEW==='dash'){ paintKpis(); paintOverview(); wireDash(); }
   else if(VIEW==='plan'){ paintPlan(); }
   else if(VIEW==='late'){ paintOverdue(); }
   else { paintMore(); }
