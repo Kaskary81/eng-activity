@@ -345,6 +345,18 @@ table.daily tr.td-today td{background:var(--chip)}
   .wrap{padding-bottom:calc(84px + var(--safe-b))}
   .planbar .wk{min-width:0;flex:1}
 }
+
+.btn.primary{background:linear-gradient(180deg,var(--violet),var(--violet2));border-color:transparent;
+  color:#fff;box-shadow:0 6px 18px rgba(124,58,237,.4)}
+.btn.primary:hover{box-shadow:0 10px 26px rgba(124,58,237,.55);color:#fff}
+.btn.danger{border-color:rgba(244,63,94,.5);color:#fda4af}
+.btn.danger:hover{background:rgba(244,63,94,.15);border-color:var(--hot);color:#fff}
+#fab{display:none;position:fixed;right:18px;bottom:calc(84px + var(--safe-b));z-index:71;
+  width:54px;height:54px;border-radius:50%;font-size:27px;line-height:1;color:#fff;
+  background:linear-gradient(145deg,var(--violet),var(--violet2));
+  box-shadow:0 12px 30px rgba(124,58,237,.55);transition:.25s var(--spring)}
+#fab:active{transform:scale(.92)}
+@media (min-width:761px){#fab{display:none!important}}
 </style>
 </head>
 <body>
@@ -381,6 +393,7 @@ table.daily tr.td-today td{background:var(--chip)}
   </header>
   <div class="wrap" id="wrap"></div>
 </div>
+<button id="fab" title="New record">+</button>
 <nav id="mtabs"></nav>
 <div class="sheet" id="sheet"></div>
 <div id="toast"></div>
@@ -388,7 +401,7 @@ table.daily tr.td-today td{background:var(--chip)}
 <script>
 const SB_URL='https://ivmmnsjiekhjxkhllncb.supabase.co';
 const SB_KEY='sb_publishable_RTHsaxZXVmRBQziLbFJX8g_PAaZzIbF';
-const BUILD='ENG 2026-08-22 · e11';
+const BUILD='ENG 2026-08-22 · e12';
 
 let SESSION=null, ME=null;
 let PROJECTS=[], PEOPLE=[], AB=[], SD=[], GIS=[], HIST=[], INV=[];
@@ -630,7 +643,8 @@ function openSheet(id){
   const sh=document.getElementById('sheet');
   sh.innerHTML=`<div class="sh"><button class="iconb" id="shx">←</button>
       <b style="flex:1">${esc(row.submittal_no||row.description||row.start_manhole||'Record')}</b>
-      ${canEdit()?'':'<span class="who">read only</span>'}</div>
+      ${canEdit()?'<button class="iconb" id="shdel" title="Delete this record">🗑</button>'
+                 :'<span class="who">read only</span>'}</div>
     <div class="sb">${fields.map(([k,label,type,opts])=>{
       const v=row[k]??'';
       const dis=canEdit()?'':' disabled';
@@ -651,6 +665,8 @@ function openSheet(id){
     </div>`;
   sh.classList.add('on');
   document.getElementById('shx').onclick=()=>{sh.classList.remove('on');};
+  const dl=document.getElementById('shdel');
+  if(dl)dl.onclick=()=>deleteRecord(row.id);
   const lg=document.getElementById('logcy');
   if(lg)lg.onclick=()=>logCycle(KIND[TAB],row.id);
   sh.querySelectorAll('[data-del]').forEach(b=>b.onclick=async e=>{
@@ -968,6 +984,59 @@ function paintMore(){
   $('mout').onclick=()=>{try{localStorage.removeItem('eng-session');}catch(e){}location.reload();};
 }
 
+
+/* ---------- adding and deleting records ---------- */
+const LISTOF={asbuilts:()=>AB,shop:()=>SD,gis:()=>GIS,invoice:()=>INV};
+const NEWROW={
+  asbuilts:()=>({submittal_no:'',description:'New as-built drawing',discipline:'',
+    revision:null,status:'Notsubmitted',category:'',zone:'',comments:''}),
+  shop:()=>({submittal_no:'',description:'New shop drawing',discipline:'',zone:'',
+    last_revision:null,review_status:'Not Submitted',
+    planned_date:'',submitted_date:'',received_date:''}),
+  gis:()=>({description:'New GIS submittal',last_revision:null,review_status:'Not Submitted',
+    planned_date:'',submitted_date:'',received_date:''}),
+  invoice:()=>({start_manhole:'',stop_manhole:'',diameter_mm:null,length_m:null,
+    method:'Open Cut',backdrops:null,yt_connections:null,
+    status:'Not Submitted',invoice_no:'',asbuilt_submittal_no:''})};
+
+async function newRecord(){
+  if(!canEdit())return toast('You have view-only access');
+  const proj = PROJ || (PROJECTS[0]&&PROJECTS[0].id) || null;
+  const body = {...NEWROW[TAB](), project_id:proj};
+  try{
+    const made=await api(TABLE[TAB],{method:'POST',body:JSON.stringify(body)});
+    const row=made&&made[0];
+    if(!row)throw new Error('The record was not returned');
+    LISTOF[TAB]().push(row);
+    F=''; Q=''; DF={field:'',from:'',to:''};
+    paint();
+    openSheet(row.id);
+    toast('New record added'+(proj?' to '+projName(proj):''));
+  }catch(e){ toast(e.message); }
+}
+
+async function deleteRecord(id){
+  const list=LISTOF[TAB](), i=list.findIndex(r=>r.id===id);
+  if(i<0)return;
+  const gone=list[i];
+  msgBox('Delete this record?',
+    `<div style="color:var(--ink2);font-size:13.5px;line-height:1.5">
+       <b>${esc(gone.submittal_no||gone.description||gone.start_manhole||'This record')}</b>
+       will be removed, along with any submission history it has.
+       <div style="color:var(--ink3);font-size:12px;margin-top:8px">This cannot be undone.</div></div>`,
+    [['Keep it',null,''],['Delete',async()=>{
+      list.splice(i,1);
+      document.getElementById('sheet').classList.remove('on');
+      paint();
+      try{
+        if(KIND[TAB])await api('eng_history?kind=eq.'+KIND[TAB]+'&record_id=eq.'+id,{method:'DELETE'});
+        await api(TABLE[TAB]+'?id=eq.'+id,{method:'DELETE'});
+        HIST=HIST.filter(h=>!(h.kind===KIND[TAB]&&h.record_id===id));
+        toast('Record deleted');
+      }catch(e){ list.splice(i,0,gone); paint(); toast(e.message); }
+    },'danger']]);
+}
+
 /* ---------- painting ---------- */
 function paintRail(){
   const all=AB.length+SD.length+GIS.length+INV.length;
@@ -1028,6 +1097,7 @@ function paintTools(){
            : (TAB==='gis'||TAB==='shop') ? [['','Everything'],['open','Not approved'],['done','Approved']]
                             : [['','Everything'],['open','Not submitted'],['done','Submitted']];
   $('tools').innerHTML=
+    (canEdit()?`<button class="btn primary" id="newrec">+ New</button>`:'')+
     `<input class="f" id="q" placeholder="Search…" style="min-width:200px;flex:1;max-width:340px"
        value="${esc(Q)}">`+
     F1.map(([k,l])=>`<button class="btn ${F===k?'on':''}" data-f="${k}">${l}</button>`).join('')+
@@ -1038,6 +1108,7 @@ function paintTools(){
      <span class="count" id="count"></span>`;
   $('q').oninput=e=>{Q=e.target.value;paintTable();};
   $('tools').querySelectorAll('[data-f]').forEach(b=>b.onclick=()=>{F=b.dataset.f;paint();});
+  if($('newrec'))$('newrec').onclick=newRecord;
   $('csv').onclick=exportCSV;
   $('pdf').onclick=exportPDF;
   $('dates').onclick=openDateFilter;
@@ -1116,6 +1187,8 @@ function wireDaily(){
 }
 function paint(){
   paintNav();
+  const fab=$('fab');
+  if(fab)fab.style.display=(VIEW==='reg'&&canEdit())?'':'none';
   paintRail();
   const onReg = VIEW==='reg';
   $('tabs').style.display  = onReg?'':'none';
@@ -1190,6 +1263,7 @@ $('lgo').onclick=async()=>{
     start();
   }catch(e){err.textContent=e.message;b.disabled=false;b.textContent='Sign in';}
 };
+$('fab').onclick=newRecord;
 $('lpw').addEventListener('keydown',e=>{if(e.key==='Enter')$('lgo').click();});
 $('out').onclick=()=>{try{localStorage.removeItem('eng-session');}catch(e){}location.reload();};
 
