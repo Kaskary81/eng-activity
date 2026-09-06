@@ -957,7 +957,7 @@ body.breaking,body.breaking *{user-select:none!important;-webkit-user-select:non
 <script>
 const SB_URL='https://ivmmnsjiekhjxkhllncb.supabase.co';
 const SB_KEY='sb_publishable_RTHsaxZXVmRBQziLbFJX8g_PAaZzIbF';
-const BUILD='ENG 2026-09-06 · e70';
+const BUILD='ENG 2026-09-06 · e71';
 
 let SESSION=null, ME=null;
 let PROJECTS=[], PEOPLE=[], AB=[], SD=[], GIS=[], HIST=[], INV=[];
@@ -3027,17 +3027,18 @@ function shatter(el,then){
     const mx=((p1[0]+p2[0])/2-cx), my=((p1[1]+p2[1])/2-cy);
     const len=Math.hypot(mx,my)||1;
     pieces.push({el:d, x:0, y:0,
-      /* thrown hard, as it was — the walls below keep it on screen */
-      vx:(mx/len)*(1.6+Math.random()*1.9),
-      vy:(my/len)*1.1-(2.6+Math.random()*1.6),
-      rot:0, vr:(Math.random()-0.5)*9,
+      /* it should break apart and drop, not be flung — the pieces stay near
+         the card they came from and settle on what is under it */
+      vx:(mx/len)*(0.55+Math.random()*0.65),
+      vy:(my/len)*0.5-(1.0+Math.random()*0.8),
+      rot:0, vr:(Math.random()-0.5)*4.5,
       /* where this piece's own lowest corner sits, so it lands on its edge */
       foot:r.top+r.height*(Math.max(cy,p1[1],p2[1])/100),
       cxpx:r.left+r.width*((cx+p1[0]+p2[0])/300),
       rest:false, bounces:0});
   }
 
-  const G=0.62, AIR=0.995, BOUNCE=0.36, FRICTION=0.72;
+  const G=0.58, AIR=0.982, BOUNCE=0.3, FRICTION=0.6;
   let last=performance.now();
   const step=now=>{
     /* a negative or wild delta — a tab coming back, a clock that jumps —
