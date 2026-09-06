@@ -545,7 +545,7 @@ table.g th .fmark{font-style:normal;font-size:9px;opacity:.85}
 <script>
 const SB_URL='https://ivmmnsjiekhjxkhllncb.supabase.co';
 const SB_KEY='sb_publishable_RTHsaxZXVmRBQziLbFJX8g_PAaZzIbF';
-const BUILD='ENG 2026-08-31 · e20';
+const BUILD='ENG 2026-08-31 · e21';
 
 let SESSION=null, ME=null;
 let PROJECTS=[], PEOPLE=[], AB=[], SD=[], GIS=[], HIST=[], INV=[];
@@ -1309,12 +1309,15 @@ function paintTools(){
     `<input class="f" id="q" placeholder="Search…" style="min-width:200px;flex:1;max-width:340px"
        value="${esc(Q)}">`+
     F1.map(([k,l])=>`<button class="btn ${F===k?'on':''}" data-f="${k}">${l}</button>`).join('')+
-    `<button class="btn" id="dates"${(DF.from||DF.to)?' style="border-color:var(--violet);color:#e9d5ff"':''}>${
+    `<button class="btn" id="dates"${(DF.from||DF.to)?' style="border-color:var(--accent);color:var(--accent)"':''}>${
        (DF.from||DF.to)?esc((DATECOLS[TAB].find(c=>c[0]===DF.field)||['','Date'])[1]+' '+(DF.from||'…')+' → '+(DF.to||'…')):'Dates'}</button>
      <button class="btn" id="csv">Export CSV</button>
      <button class="btn" id="pdf">Print</button>
+     ${anyFilter()?`<button class="btn" id="clrf" title="${esc(filterSummary())}"
+        style="border-color:var(--accent);color:var(--accent)">✕ Clear filters</button>`:''}
      <span class="count" id="count"></span>`;
   $('q').oninput=e=>{Q=e.target.value;paintTable();};
+  if($('clrf'))$('clrf').onclick=()=>clearAllFilters();
   $('tools').querySelectorAll('[data-f]').forEach(b=>b.onclick=()=>{F=b.dataset.f;paint();});
   if($('cleardrill'))$('cleardrill').onclick=clearDrill;
   if($('newrec'))$('newrec').onclick=newRecord;
@@ -1367,6 +1370,34 @@ function rowsForFilter(exceptKey){
     return true;
   });
 }
+
+/* is anything narrowing the register at the moment? */
+function anyFilter(){
+  return !!(Q || (F&&F!=='') || DF.from || DF.to || RSTATE ||
+            Object.keys(CFILT||{}).some(k=>(CFILT[k]||[]).length));
+}
+/* what the Clear button will undo, named on its tooltip */
+function filterSummary(){
+  const bits=[];
+  if(Q)bits.push('search "'+Q+'"');
+  if(F)bits.push(F==='open'?'not approved':F==='done'?'approved':F);
+  if(DF.from||DF.to)bits.push('dates '+(DF.from||'…')+' → '+(DF.to||'…'));
+  if(RSTATE)bits.push('a state picked on the dashboard');
+  const cols=COLS[TAB]||[];
+  Object.keys(CFILT||{}).forEach(k=>{
+    if(!(CFILT[k]||[]).length)return;
+    const c=cols.find(x=>x.k===k);
+    bits.push((c?c.t:k)+' ('+CFILT[k].length+')');
+  });
+  return bits.length?('Clears: '+bits.join(' · ')):'Nothing is filtered';
+}
+function clearAllFilters(){
+  Q=''; F=''; DF={field:'',from:'',to:''}; RSTATE='';
+  CFILT={}; saveCFilt();
+  paint(); if(typeof redrawWins==='function')redrawWins();
+  toast('Filters cleared');
+}
+
 function colFilterBox(k,cols){
   const c=cols.find(x=>x.k===k); if(!c)return;
   const rows=rowsForFilter(k);
