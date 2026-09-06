@@ -746,7 +746,7 @@ table.g tbody tr:hover .openb{color:var(--ink2)}
 <script>
 const SB_URL='https://ivmmnsjiekhjxkhllncb.supabase.co';
 const SB_KEY='sb_publishable_RTHsaxZXVmRBQziLbFJX8g_PAaZzIbF';
-const BUILD='ENG 2026-09-06 · e45';
+const BUILD='ENG 2026-09-06 · e46';
 
 let SESSION=null, ME=null;
 let PROJECTS=[], PEOPLE=[], AB=[], SD=[], GIS=[], HIST=[], INV=[];
@@ -1110,7 +1110,7 @@ function openSheet(id){
       const input =
         type==='area' ? `<textarea id="f-${k}"${dis}>${esc(v)}</textarea>`
       : type==='sel'  ? (()=>{ /* worked out now, so it follows this project's client */
-            const list=liveOptions(k,opts);
+            const list=liveOptions(k,opts,row);
             const extra=(v&&!list.includes(v))?[v]:[];
             return `<select id="f-${k}"${dis}>${['',...list,...extra].map(o=>
               `<option${String(v)===o?' selected':''}>${esc(o)}</option>`).join('')}</select>`; })()
@@ -2482,8 +2482,16 @@ function wireCombos(scope){
 
 /* the choices for a select field, worked out NOW rather than when the file
    loaded — the review list depends on which client the project answers to */
-function liveOptions(key,fallback){
-  if(key==='review_status'||key==='status'&&TAB==='gis')return REVIEW;
+function liveOptions(key,fallback,row){
+  if(key==='review_status'||(key==='status'&&TAB==='gis')){
+    const pid = row&&row.project_id!=null ? row.project_id : PROJ;
+    if(pid!=null){
+      const p=(PROJECTS||[]).find(x=>String(x.id)===String(pid));
+      return (p&&p.client==='Maaden') ? REVIEW_MAADEN : REVIEW_NWC;
+    }
+    /* nothing to go on — offer both rather than hide anything */
+    return [...new Set([...REVIEW_NWC,...REVIEW_MAADEN])];
+  }
   return fallback||[];
 }
 
@@ -2524,7 +2532,7 @@ function beginCellEdit(r,c,seed){
   let el;
   if(kind==='sel'){
     el=document.createElement('select');
-    const opts=liveOptions(col.k,f[3]);
+    const opts=liveOptions(col.k,f[3],row);
     el.innerHTML=opts.map(o=>`<option${String(o)===cur?' selected':''}>${esc(o)}</option>`).join('')+
       ((cur&&!opts.includes(cur))?`<option selected>${esc(cur)}</option>`:'');
   }else if((kind==='text'||kind==='area')&&seed===undefined&&colChoices(col.k).length){
