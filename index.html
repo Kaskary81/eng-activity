@@ -873,6 +873,22 @@ table.g tbody tr:hover .openb{color:var(--ink2)}
 .dbar,.dtrack,.hbar,.dchips,.mkpi .kpi .bar,#loupe{
   user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
 .dbar i,.dtrack i,.hbar i{-webkit-tap-highlight-color:transparent}
+
+/* the card coming apart */
+.shatter{position:fixed;z-index:8500;pointer-events:none;perspective:700px}
+.shatter .shard{position:absolute;inset:0;overflow:hidden;
+  background:var(--surface);border-radius:18px;box-shadow:var(--shadow);
+  padding:14px 16px;box-sizing:border-box;
+  animation:shard-fly .43s cubic-bezier(.2,.7,.3,1) both}
+@keyframes shard-fly{
+  0%  {transform:none;opacity:1}
+  28% {transform:translate(calc(var(--dx)*.35),calc(var(--dy)*.35)) rotate(calc(var(--rot)*.3))}
+  100%{transform:translate(var(--dx),var(--dy)) rotate(var(--rot)) scale(.97);opacity:0}
+}
+.mcard.cracked{opacity:0}
+.mcard.remade{animation:remade .26s var(--spring) both}
+@keyframes remade{from{transform:scale(.965);opacity:.4}to{transform:none;opacity:1}}
+@media (prefers-reduced-motion:reduce){.shatter{display:none}}
 </style>
 <script>
 (()=>{ let t=null; try{ t=localStorage.getItem('eng_theme'); }catch(e){}
@@ -930,7 +946,7 @@ table.g tbody tr:hover .openb{color:var(--ink2)}
 <script>
 const SB_URL='https://ivmmnsjiekhjxkhllncb.supabase.co';
 const SB_KEY='sb_publishable_RTHsaxZXVmRBQziLbFJX8g_PAaZzIbF';
-const BUILD='ENG 2026-09-06 · e62';
+const BUILD='ENG 2026-09-06 · e63';
 
 let SESSION=null, ME=null;
 let PROJECTS=[], PEOPLE=[], AB=[], SD=[], GIS=[], HIST=[], INV=[];
@@ -2870,8 +2886,7 @@ function wireCardHold(){
       const x=e.touches?e.touches[0].clientX:e.clientX, y=e.touches?e.touches[0].clientY:e.clientY;
       _lp={x,y,fired:false,t:setTimeout(()=>{
         _lp.fired=true;
-        if(navigator.vibrate)navigator.vibrate(12);
-        cardMenu(id);
+        shatter(el,()=>cardMenu(id));
       },480)};
     };
     const move=e=>{
@@ -2890,6 +2905,56 @@ function wireCardHold(){
       _lp=null; return; } openSheet(id); },true);
   });
 }
+
+/* ============================================================
+   Holding a card breaks it. Each shard is a copy of the card clipped
+   to a wedge, so the pieces carry the real text rather than a blur;
+   they fly apart, then the card settles back and the menu opens.
+   ============================================================ */
+function shatter(el,then){
+  const reduced=window.matchMedia('(prefers-reduced-motion:reduce)').matches;
+  if(reduced){ if(then)then(); return; }
+  const r=el.getBoundingClientRect();
+  const N=7;
+  /* a rough centre the cracks radiate from, off-centre so it looks struck */
+  const cx=35+Math.random()*30, cy=30+Math.random()*40;
+  const stage=document.createElement('div');
+  stage.className='shatter';
+  stage.style.cssText=`left:${r.left}px;top:${r.top}px;width:${r.width}px;height:${r.height}px`;
+  /* the rim of the card, walked round in N uneven steps */
+  const rim=[];
+  for(let i=0;i<N;i++){
+    const a=(i/N)*Math.PI*2 + (Math.random()-0.5)*0.5;
+    const far=140;
+    rim.push([cx+Math.cos(a)*far, cy+Math.sin(a)*far]);
+  }
+  for(let i=0;i<N;i++){
+    const p1=rim[i], p2=rim[(i+1)%N];
+    const piece=document.createElement('div');
+    piece.className='shard';
+    piece.style.clipPath=`polygon(${cx}% ${cy}%, ${p1[0]}% ${p1[1]}%, ${p2[0]}% ${p2[1]}%)`;
+    piece.innerHTML=el.innerHTML;
+    /* where this piece is thrown */
+    const mid=((p1[0]+p2[0])/2-cx), midy=((p1[1]+p2[1])/2-cy);
+    const d=Math.hypot(mid,midy)||1;
+    piece.style.setProperty('--dx',(mid/d*26).toFixed(1)+'px');
+    piece.style.setProperty('--dy',(midy/d*22-6).toFixed(1)+'px');
+    piece.style.setProperty('--rot',((Math.random()-0.5)*26).toFixed(1)+'deg');
+    piece.style.animationDelay=(i*14)+'ms';
+    stage.appendChild(piece);
+  }
+  document.body.appendChild(stage);
+  el.classList.add('cracked');
+  if(navigator.vibrate)navigator.vibrate([8,26,12]);
+  setTimeout(()=>{
+    stage.remove();
+    el.classList.remove('cracked');
+    el.classList.add('remade');
+    setTimeout(()=>el.classList.remove('remade'),260);
+    if(then)then();
+  },430);
+}
+
 function cardMenu(id){
   const row=(rowsOf(TAB)||[]).find(r=>r.id===id); if(!row)return;
   const title=row.description||row.doc_no||row.submittal_no||('#'+id);
