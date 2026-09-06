@@ -746,7 +746,7 @@ table.g tbody tr:hover .openb{color:var(--ink2)}
 <script>
 const SB_URL='https://ivmmnsjiekhjxkhllncb.supabase.co';
 const SB_KEY='sb_publishable_RTHsaxZXVmRBQziLbFJX8g_PAaZzIbF';
-const BUILD='ENG 2026-09-06 · e47';
+const BUILD='ENG 2026-09-06 · e48';
 
 let SESSION=null, ME=null;
 let PROJECTS=[], PEOPLE=[], AB=[], SD=[], GIS=[], HIST=[], INV=[];
@@ -1115,8 +1115,10 @@ function openSheet(id){
       : type==='sel'  ? (()=>{ /* worked out now, so it follows this project's client */
             const list=liveOptions(k,opts,row);
             const extra=(v&&!list.includes(v))?[v]:[];
+            const show=o=>o===''?'— none —':(MAADEN_GRADE[o]?maadenLabel(o):o);
             return `<select id="f-${k}"${dis}>${['',...list,...extra].map(o=>
-              `<option${String(v)===o?' selected':''}>${esc(o)}</option>`).join('')}</select>`; })()
+              `<option value="${esc(o)}"${String(v)===o?' selected':''}>${esc(show(o))}</option>`
+              ).join('')}</select>`; })()
       : type==='date' ? `<input id="f-${k}" type="date" value="${esc(v)}"${dis}>`
       : type==='num'  ? `<input id="f-${k}" type="number" value="${esc(v)}"${dis}>`
       : (()=>{ const ch=colChoices(k);
@@ -2542,8 +2544,10 @@ function beginCellEdit(r,c,seed){
   if(kind==='sel'){
     el=document.createElement('select');
     const opts=liveOptions(col.k,f[3],row);
-    el.innerHTML=opts.map(o=>`<option${String(o)===cur?' selected':''}>${esc(o)}</option>`).join('')+
-      ((cur&&!opts.includes(cur))?`<option selected>${esc(cur)}</option>`:'');
+    const show=o=>MAADEN_GRADE[o]?maadenLabel(o):o;
+    el.innerHTML=opts.map(o=>
+        `<option value="${esc(o)}"${String(o)===cur?' selected':''}>${esc(show(o))}</option>`).join('')+
+      ((cur&&!opts.includes(cur))?`<option value="${esc(cur)}" selected>${esc(show(cur))}</option>`:'');
   }else if((kind==='text'||kind==='area')&&seed===undefined&&colChoices(col.k).length){
     /* a column whose values repeat gets a real dropdown, so every choice is
        visible — the browser's own suggestion list only shows what matches
