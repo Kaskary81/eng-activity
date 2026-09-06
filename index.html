@@ -839,6 +839,12 @@ table.g tbody tr:hover .openb{color:var(--ink2)}
   /* windows are a desktop idea; a phone has one screen */
   #winbtn,#tidybtn,#desktop,#dock,#snapghost{display:none!important}
 }
+
+.mkpi .kpi .v small{font-family:inherit;font-size:12px;font-weight:600;color:var(--ink3);margin-left:6px}
+.mkpi .kpi{cursor:pointer}
+.dsec.late{border-left:3px solid var(--critical)}
+.bignum{font-family:var(--mono);font-size:34px;font-weight:700;letter-spacing:-.04em;
+  color:var(--critical);line-height:1}
 </style>
 <script>
 (()=>{ let t=null; try{ t=localStorage.getItem('eng_theme'); }catch(e){}
@@ -896,7 +902,7 @@ table.g tbody tr:hover .openb{color:var(--ink2)}
 <script>
 const SB_URL='https://ivmmnsjiekhjxkhllncb.supabase.co';
 const SB_KEY='sb_publishable_RTHsaxZXVmRBQziLbFJX8g_PAaZzIbF';
-const BUILD='ENG 2026-09-06 · e55';
+const BUILD='ENG 2026-09-06 · e56';
 
 let SESSION=null, ME=null;
 let PROJECTS=[], PEOPLE=[], AB=[], SD=[], GIS=[], HIST=[], INV=[];
@@ -3526,36 +3532,34 @@ function invSections(states){
 
 /* The Overview a phone shows: the same figures as the desktop, as blocks. */
 function mobOverview(){
+  /* One card per state, so the percentages add to exactly 100 — the cards are
+     a division of the register, not a set of separate measures. */
   const {rows:states,total}=regSplit(TAB);
-  const src=rowsOf(TAB);
   const label=(TABS.find(t=>t.k===TAB)||{}).t||'';
-  const sent=src.filter(r=>r.submitted_date).length;
-  const back=src.filter(r=>r.received_date).length;
+  const src=rowsOf(TAB);
   const late=src.filter(r=>r.planned_date&&r.planned_date<today&&!r.submitted_date).length;
-  const pct=(n,d)=>d?Math.round(n/d*100):0;
-  const card=(k,v,p,frac,col)=>`<div class="kpi">
-      <div class="k">${esc(k)}</div><div class="v">${esc(String(v))}</div>
-      <div class="p">${esc(p)}</div>
-      ${frac==null?'':`<div class="bar"><i style="width:${Math.max(2,frac)}%;background:${col||'var(--accent)'}"></i></div>`}
-    </div>`;
-  const done=states[0]||{n:0,p:0,t:''};
+  const shown=states.filter(x=>x.n);                 /* nothing empty is drawn */
+  const sum=shown.reduce((t,x)=>t+x.n,0);
+  const psum=shown.reduce((t,x)=>t+x.p,0);
   return `<div class="mkpi">
-      ${card(String(label).toLowerCase(),total,(PROJ?projName(PROJ):'all projects'),null)}
-      ${card(done.t||'done',done.n,`${done.p}% of ${total}`,done.p,'var(--good)')}
-      ${card('submitted',sent,`${pct(sent,total)}% issued`,pct(sent,total),'var(--sky)')}
-      ${card('came back',back,`${pct(back,sent)}% of what went out`,pct(back,sent||1),'var(--good)')}
-      ${card('overdue',late,late?'past the planned date':'nothing late',
-             pct(late,total),'var(--critical)')}
-      ${card('still to send',total-sent,`${pct(total-sent,total)}% of the register`,
-             pct(total-sent,total),'var(--warn)')}
-    </div>`
-    + `<div class="dsec"><div class="dhead"><h3>Where they stand</h3></div>
-      <div class="dbar">${states.filter(x=>x.n).map(x=>
-        `<i data-rstate="${esc(x.k)}" style="width:${x.n/(total||1)*100}%;background:${x.c}"><b>${x.n}</b></i>`
-        ).join('')}</div>
-      <div class="dchips">${states.map(x=>
-        `<span class="dchip" data-rstate="${esc(x.k)}"><i style="background:${x.c}"></i>
-          ${esc(x.t)} <b>${x.n}</b></span>`).join('')}</div></div>`;
+      ${shown.map(x=>`<div class="kpi" data-rstate="${esc(x.k)}">
+          <div class="k">${esc(x.t)}</div>
+          <div class="v">${x.n}<small>${x.p}%</small></div>
+          <div class="p">${esc(x.s)}</div>
+          <div class="bar"><i style="width:${Math.max(2,x.p)}%;background:${x.c}"></i></div>
+        </div>`).join('')}
+    </div>
+    <div class="dsec">
+      <div class="dbar">${shown.map(x=>
+        `<i data-rstate="${esc(x.k)}" style="width:${x.n/(total||1)*100}%;background:${x.c}"
+            title="${esc(x.t)} — ${x.n}"><b>${x.n}</b></i>`).join('')}</div>
+      <div class="dnote"><b>${sum} of ${total}</b> ${esc(String(label).toLowerCase())} ·
+        <b>${psum}%</b> — every record is in exactly one of these${
+        (sum===total&&psum===100)?'':' <span class="bad">(does not close)</span>'}</div>
+    </div>
+    ${late?`<div class="dsec late"><div class="dhead"><h3>Overdue</h3></div>
+      <div class="bignum">${late}</div>
+      <div class="dnote">past the planned date and not yet sent</div></div>`:''}`;
 }
 
 function paintOverview(){
