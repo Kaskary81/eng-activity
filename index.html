@@ -813,6 +813,18 @@ table.g tbody tr:hover .openb{color:var(--ink2)}
 .mkpi .kpi .p{font-size:10.5px;color:var(--ink2);margin-top:4px;line-height:1.35}
 .mkpi .kpi .bar{height:3px;border-radius:2px;background:var(--chip);margin-top:10px;overflow:hidden}
 .mkpi .kpi .bar i{display:block;height:100%;border-radius:2px}
+
+@media (max-width:760px){
+  /* 1. the tab bar sits over the page, so the page must end above it */
+  .wrap{padding-bottom:calc(96px + var(--safe-b))!important}
+  body{padding-bottom:0}
+  /* 2. the header carries the title and the bell only — the name and the
+        sign-out button belong in More, as they do in the LOD */
+  #topbar .who,#topbar #out{display:none!important}   /* both live in More */
+  #topbar{justify-content:space-between}
+  /* 3. the live line is the taskbar's job on a desktop; on a phone it is noise */
+  #statusline{display:none!important}
+}
 </style>
 <script>
 (()=>{ let t=null; try{ t=localStorage.getItem('eng_theme'); }catch(e){}
@@ -867,7 +879,7 @@ table.g tbody tr:hover .openb{color:var(--ink2)}
 <script>
 const SB_URL='https://ivmmnsjiekhjxkhllncb.supabase.co';
 const SB_KEY='sb_publishable_RTHsaxZXVmRBQziLbFJX8g_PAaZzIbF';
-const BUILD='ENG 2026-09-06 · e52';
+const BUILD='ENG 2026-09-06 · e53';
 
 let SESSION=null, ME=null;
 let PROJECTS=[], PEOPLE=[], AB=[], SD=[], GIS=[], HIST=[], INV=[];
@@ -1624,6 +1636,9 @@ function paintMore(){
       <div class="lc-meta">Remembered on this phone</div></article>
     <article class="lcard"><div class="lc-top"><b>Signed in</b></div>
       <div class="lc-meta">${esc((ME&&ME.name)||'')} · ${esc((ME&&ME.role)||'')}</div></article>
+    <article class="lcard" data-mact="live"><div class="lc-top"><b>Updates</b></div>
+      <div class="lc-meta" id="mlive">${LIVE_OK?'Arriving live':'Checking every 20 seconds'} · ${
+        rowsOf(TAB).length} ${esc(String((TABS.find(t=>t.k===TAB)||{}).t||'').toLowerCase())}</div></article>
     <article class="lcard" id="mout"><div class="lc-top"><b>Sign out</b></div></article>
     <article class="lcard"><div class="lc-meta">${esc(BUILD)}</div></article>
   </div>`;
@@ -1635,6 +1650,7 @@ function paintMore(){
     else if(a==='find'){ goView('reg'); setTimeout(()=>findReplaceBox(),150); }
     else if(a==='alerts')alertsBox();
     else if(a==='theme')toggleTheme();
+    else if(a==='live')alertsBox();
   });
   $('mout').onclick=()=>{try{localStorage.removeItem('eng-session');}catch(e){}location.reload();};
 }
