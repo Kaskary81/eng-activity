@@ -875,19 +875,14 @@ table.g tbody tr:hover .openb{color:var(--ink2)}
 .dbar i,.dtrack i,.hbar i{-webkit-tap-highlight-color:transparent}
 
 /* the card coming apart */
-.shatter{position:fixed;z-index:8500;pointer-events:none;perspective:700px}
-.shatter .shard{position:absolute;inset:0;overflow:hidden;
-  background:var(--surface);border-radius:18px;box-shadow:var(--shadow);
-  padding:14px 16px;box-sizing:border-box;
-  animation:shard-fly .43s cubic-bezier(.2,.7,.3,1) both}
-@keyframes shard-fly{
-  0%  {transform:none;opacity:1}
-  28% {transform:translate(calc(var(--dx)*.35),calc(var(--dy)*.35)) rotate(calc(var(--rot)*.3))}
-  100%{transform:translate(var(--dx),var(--dy)) rotate(var(--rot)) scale(.97);opacity:0}
-}
-.mcard.cracked{opacity:0}
-.mcard.remade{animation:remade .26s var(--spring) both}
-@keyframes remade{from{transform:scale(.965);opacity:.4}to{transform:none;opacity:1}}
+.shatter{position:fixed;inset:0;z-index:8500;pointer-events:none}
+.shatter.gone{opacity:0;transition:opacity .25s}
+.shatter .shard{position:fixed;overflow:hidden;box-sizing:border-box;
+  will-change:transform,filter;transition:filter .12s linear}
+.shatter .shard.landed{transition:filter .3s ease}
+.mcard.cracked,.mkpi .kpi.cracked{opacity:0}
+.mcard.remade,.mkpi .kpi.remade{animation:remade .28s var(--spring) both}
+@keyframes remade{from{transform:scale(.96);opacity:.35}to{transform:none;opacity:1}}
 @media (prefers-reduced-motion:reduce){.shatter{display:none}}
 
 /* a figure card that can be held */
@@ -951,7 +946,7 @@ table.g tbody tr:hover .openb{color:var(--ink2)}
 <script>
 const SB_URL='https://ivmmnsjiekhjxkhllncb.supabase.co';
 const SB_KEY='sb_publishable_RTHsaxZXVmRBQziLbFJX8g_PAaZzIbF';
-const BUILD='ENG 2026-09-06 · e64';
+const BUILD='ENG 2026-09-06 · e65';
 
 let SESSION=null, ME=null;
 let PROJECTS=[], PEOPLE=[], AB=[], SD=[], GIS=[], HIST=[], INV=[];
@@ -2912,73 +2907,125 @@ function wireCardHold(){
 }
 
 /* ============================================================
-   Holding a card breaks it. Each shard is a copy of the card clipped
-   to a wedge, so the pieces carry the real text rather than a blur;
-   they fly apart, then the card settles back and the menu opens.
+   Breaking a card, with weight. The pieces are thrown, pulled down by
+   gravity, tumble as they go, and come to rest on whatever card is
+   beneath them — each one carrying a shadow that tightens as it lands.
+   They stay where they fall until the screen is pressed.
    ============================================================ */
+let SHARDS=null;
+function clearShards(){
+  if(!SHARDS)return;
+  const {stage,card,raf}=SHARDS;
+  cancelAnimationFrame(raf);
+  stage.classList.add('gone');
+  setTimeout(()=>stage.remove(),260);
+  if(card){ card.classList.remove('cracked'); card.classList.add('remade');
+    setTimeout(()=>card.classList.remove('remade'),280); }
+  SHARDS=null;
+}
 function shatter(el,then){
-  const reduced=window.matchMedia('(prefers-reduced-motion:reduce)').matches;
-  if(reduced){ if(then)then(); return; }
-  const r=el.getBoundingClientRect();
+  if(window.matchMedia('(prefers-reduced-motion:reduce)').matches){ if(then)then(); return; }
+  clearShards();
+  const r=el.getBoundingClientRect(), cs=getComputedStyle(el);
   const N=7;
-  /* a rough centre the cracks radiate from, off-centre so it looks struck */
-  const cx=35+Math.random()*30, cy=30+Math.random()*40;
-  const cs=getComputedStyle(el);
+  /* the shelves the pieces can land on: the top edge of every other card
+     below this one, and the bottom of the screen */
+  const shelves=[...document.querySelectorAll('.mkpi .kpi,.mcard,.dsec,.panel')]
+    .filter(x=>x!==el)
+    .map(x=>{const b=x.getBoundingClientRect(); return {top:b.top,left:b.left,right:b.right};})
+    .filter(sh=>sh.top>r.top+r.height*0.3)
+    .concat([{top:innerHeight-6,left:-1e4,right:1e4}])
+    .sort((a,b)=>a.top-b.top);
+
+
   const stage=document.createElement('div');
   stage.className='shatter';
-  stage.style.cssText=`left:${r.left}px;top:${r.top}px;width:${r.width}px;height:${r.height}px`;
-  /* the rim of the card, walked round in N uneven steps */
+  document.body.appendChild(stage);
+
+  const cx=34+Math.random()*32, cy=30+Math.random()*40;
   const rim=[];
   for(let i=0;i<N;i++){
-    const a=(i/N)*Math.PI*2 + (Math.random()-0.5)*0.5;
-    const far=140;
-    rim.push([cx+Math.cos(a)*far, cy+Math.sin(a)*far]);
+    const a=(i/N)*Math.PI*2+(Math.random()-0.5)*0.5;
+    rim.push([cx+Math.cos(a)*150, cy+Math.sin(a)*150]);
   }
+  const pieces=[];
   for(let i=0;i<N;i++){
     const p1=rim[i], p2=rim[(i+1)%N];
-    const piece=document.createElement('div');
-    piece.className='shard';
-    /* borrow the broken thing's own surface, so an overview card breaks as an
-       overview card and a register card as a register card */
-    piece.style.background=cs.backgroundColor;
-    piece.style.borderRadius=cs.borderRadius;
-    piece.style.padding=cs.padding;
-    piece.style.clipPath=`polygon(${cx}% ${cy}%, ${p1[0]}% ${p1[1]}%, ${p2[0]}% ${p2[1]}%)`;
-    piece.innerHTML=el.innerHTML;
-    /* where this piece is thrown */
-    const mid=((p1[0]+p2[0])/2-cx), midy=((p1[1]+p2[1])/2-cy);
-    const d=Math.hypot(mid,midy)||1;
-    piece.style.setProperty('--dx',(mid/d*26).toFixed(1)+'px');
-    piece.style.setProperty('--dy',(midy/d*22-6).toFixed(1)+'px');
-    piece.style.setProperty('--rot',((Math.random()-0.5)*26).toFixed(1)+'deg');
-    piece.style.animationDelay=(i*14)+'ms';
-    stage.appendChild(piece);
+    const d=document.createElement('div');
+    d.className='shard';
+    d.style.cssText=`left:${r.left}px;top:${r.top}px;width:${r.width}px;height:${r.height}px;`+
+      `background:${cs.backgroundColor};border-radius:${cs.borderRadius};padding:${cs.padding};`;
+    d.style.clipPath=`polygon(${cx}% ${cy}%, ${p1[0]}% ${p1[1]}%, ${p2[0]}% ${p2[1]}%)`;
+    d.innerHTML=el.innerHTML;
+    stage.appendChild(d);
+    /* thrown away from the point of impact, with a little lift */
+    const mx=((p1[0]+p2[0])/2-cx), my=((p1[1]+p2[1])/2-cy);
+    const len=Math.hypot(mx,my)||1;
+    pieces.push({el:d, x:0, y:0,
+      vx:(mx/len)*(1.6+Math.random()*1.9),
+      vy:(my/len)*1.1-(2.6+Math.random()*1.6),
+      rot:0, vr:(Math.random()-0.5)*9,
+      /* where this piece's own lowest corner sits, so it lands on its edge */
+      foot:r.top+r.height*(Math.max(cy,p1[1],p2[1])/100),
+      cxpx:r.left+r.width*((cx+p1[0]+p2[0])/300),
+      rest:false, bounces:0});
   }
-  document.body.appendChild(stage);
+
+  const G=0.62, AIR=0.995, BOUNCE=0.36, FRICTION=0.72;
+  let last=performance.now();
+  const step=now=>{
+    /* a negative or wild delta — a tab coming back, a clock that jumps —
+       would flip gravity or fling the pieces off screen */
+    const dt=Math.max(0.2,Math.min(2.2,(now-last)/16.67)); last=now;
+    let moving=false;
+    for(const p of pieces){
+      if(!p.rest){
+        moving=true;
+        const footWas=p.foot+p.y;              /* where its lowest corner was */
+        p.vy+=G*dt; p.vx*=AIR; p.x+=p.vx*dt; p.y+=p.vy*dt; p.rot+=p.vr*dt;
+        const footNow=p.foot+p.y, xNow=p.cxpx+p.x;
+        if(p.vy>0){
+          /* a swept test: did the corner cross a shelf during this step? A
+             fast piece moves further than any fixed window, so checking the
+             line it travelled is the only way it cannot fall straight through */
+          for(const sh of shelves){
+            if(footWas<=sh.top && footNow>=sh.top
+               && xNow>sh.left-40 && xNow<sh.right+40){
+              p.y-=(footNow-sh.top);
+              if(Math.abs(p.vy)>2.2 && p.bounces<2){
+                p.vy=-Math.abs(p.vy)*BOUNCE; p.vx*=FRICTION; p.vr*=FRICTION; p.bounces++;
+              }else{
+                p.vy=0; p.vx=0; p.vr=0; p.rest=true;
+                p.el.classList.add('landed');
+              }
+              break;
+            }
+          }
+        }
+      }
+      /* the shadow tightens as the piece nears what it will land on */
+      const h=Math.max(0,Math.min(1,(p.vy>0?p.vy:0)/12));
+      p.el.style.transform=`translate(${p.x.toFixed(1)}px,${p.y.toFixed(1)}px) rotate(${p.rot.toFixed(1)}deg)`;
+      p.el.style.filter=`drop-shadow(0 ${(4+h*14).toFixed(1)}px ${(6+h*16).toFixed(1)}px rgba(0,0,0,${(0.5-h*0.22).toFixed(2)}))`;
+    }
+    if(moving)SHARDS.raf=requestAnimationFrame(step);
+  };
   el.classList.add('cracked');
-  if(navigator.vibrate)navigator.vibrate([8,26,12]);
+  if(navigator.vibrate)navigator.vibrate([9,28,14]);
+  SHARDS={stage,card:el,raf:requestAnimationFrame(step)};
+  /* they stay put; the next press anywhere puts the card back together */
   setTimeout(()=>{
-    stage.remove();
-    el.classList.remove('cracked');
-    el.classList.add('remade');
-    setTimeout(()=>el.classList.remove('remade'),260);
-    if(then)then();
-  },430);
+    document.addEventListener('pointerdown',clearShards,{once:true});
+    document.addEventListener('touchstart',clearShards,{once:true});
+  },80);
+  if(then)then();
 }
 
-
-/* Holding a figure on the Overview breaks it, then filters the register to
-   those records — the same thing a tap does, with the break to confirm it. */
 function wireOverviewHold(){
   document.querySelectorAll('.mkpi .kpi[data-rstate]').forEach(card=>{
     if(card._hold)return; card._hold=1;
     let t=null, fired=false, sx=0, sy=0;
-    const go=()=>{ fired=true;
-      shatter(card,()=>{
-        const st=card.dataset.rstate;
-        RSTATE=(RSTATE===st)?'':st; VIEW='reg'; paint();
-      });
-    };
+    const go=()=>{ fired=true; shatter(card); };   /* break it, and leave it broken */
     const start=e=>{
       const p=e.touches?e.touches[0]:e;
       sx=p.clientX; sy=p.clientY; fired=false;
