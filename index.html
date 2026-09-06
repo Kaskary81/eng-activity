@@ -792,6 +792,27 @@ table.g tbody tr:hover .openb{color:var(--ink2)}
   .msheetcard{background:var(--m-card);border-radius:22px 22px 0 0}
   .statusbar,#statusline{background:var(--m-card);border:0}
 }
+
+@media (max-width:760px){
+  /* the header used to stay put while only the list moved; on a phone the
+     whole page should scroll, so the chips and tabs get out of the way */
+  html,body{height:auto;overflow:visible}
+  #app{display:block;height:auto;overflow:visible}
+  header{position:static;flex:none}
+  .wrap{overflow:visible;max-height:none}
+  #gwrap{max-height:none;overflow:visible}
+  table.g th{position:static}
+}
+/* the Overview, laid out as the LOD lays it out: two columns of blocks */
+.mkpi{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-bottom:13px}
+.mkpi .kpi{padding:15px 16px}
+.mkpi .kpi .k{font-size:9.5px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;
+  color:var(--ink3)}
+.mkpi .kpi .v{font-family:var(--mono);font-size:29px;font-weight:700;letter-spacing:-.035em;
+  margin-top:5px;line-height:1;color:var(--ink)}
+.mkpi .kpi .p{font-size:10.5px;color:var(--ink2);margin-top:4px;line-height:1.35}
+.mkpi .kpi .bar{height:3px;border-radius:2px;background:var(--chip);margin-top:10px;overflow:hidden}
+.mkpi .kpi .bar i{display:block;height:100%;border-radius:2px}
 </style>
 <script>
 (()=>{ let t=null; try{ t=localStorage.getItem('eng_theme'); }catch(e){}
@@ -846,7 +867,7 @@ table.g tbody tr:hover .openb{color:var(--ink2)}
 <script>
 const SB_URL='https://ivmmnsjiekhjxkhllncb.supabase.co';
 const SB_KEY='sb_publishable_RTHsaxZXVmRBQziLbFJX8g_PAaZzIbF';
-const BUILD='ENG 2026-09-06 · e51';
+const BUILD='ENG 2026-09-06 · e52';
 
 let SESSION=null, ME=null;
 let PROJECTS=[], PEOPLE=[], AB=[], SD=[], GIS=[], HIST=[], INV=[];
@@ -1465,7 +1486,7 @@ async function reloadRecord(kind,id){
    shape as the snag and LOD trackers: a bar on top, tabs at the
    bottom of the phone.
    ============================================================ */
-let VIEW='reg';
+let VIEW='dash';   /* the Overview is what you want first */
 let RSTATE='';
 const ICON={
   dash:'<path d="M3 12h4l3-8 4 16 3-8h4"/>',
@@ -3452,12 +3473,48 @@ function invSections(states){
     + byGroup('method','By method');
 }
 
+
+/* The Overview a phone shows: the same figures as the desktop, as blocks. */
+function mobOverview(){
+  const {rows:states,total}=regSplit(TAB);
+  const src=rowsOf(TAB);
+  const label=(TABS.find(t=>t.k===TAB)||{}).t||'';
+  const sent=src.filter(r=>r.submitted_date).length;
+  const back=src.filter(r=>r.received_date).length;
+  const late=src.filter(r=>r.planned_date&&r.planned_date<today&&!r.submitted_date).length;
+  const pct=(n,d)=>d?Math.round(n/d*100):0;
+  const card=(k,v,p,frac,col)=>`<div class="kpi">
+      <div class="k">${esc(k)}</div><div class="v">${esc(String(v))}</div>
+      <div class="p">${esc(p)}</div>
+      ${frac==null?'':`<div class="bar"><i style="width:${Math.max(2,frac)}%;background:${col||'var(--accent)'}"></i></div>`}
+    </div>`;
+  const done=states[0]||{n:0,p:0,t:''};
+  return `<div class="mkpi">
+      ${card(String(label).toLowerCase(),total,(PROJ?projName(PROJ):'all projects'),null)}
+      ${card(done.t||'done',done.n,`${done.p}% of ${total}`,done.p,'var(--good)')}
+      ${card('submitted',sent,`${pct(sent,total)}% issued`,pct(sent,total),'var(--sky)')}
+      ${card('came back',back,`${pct(back,sent)}% of what went out`,pct(back,sent||1),'var(--good)')}
+      ${card('overdue',late,late?'past the planned date':'nothing late',
+             pct(late,total),'var(--critical)')}
+      ${card('still to send',total-sent,`${pct(total-sent,total)}% of the register`,
+             pct(total-sent,total),'var(--warn)')}
+    </div>`
+    + `<div class="dsec"><div class="dhead"><h3>Where they stand</h3></div>
+      <div class="dbar">${states.filter(x=>x.n).map(x=>
+        `<i data-rstate="${esc(x.k)}" style="width:${x.n/(total||1)*100}%;background:${x.c}"><b>${x.n}</b></i>`
+        ).join('')}</div>
+      <div class="dchips">${states.map(x=>
+        `<span class="dchip" data-rstate="${esc(x.k)}"><i style="background:${x.c}"></i>
+          ${esc(x.t)} <b>${x.n}</b></span>`).join('')}</div></div>`;
+}
+
 function paintOverview(){
   /* The LOD's shape: a few full-width sections, each one saying a whole
      thing, rather than a grid of small panels. */
   const {rows:states,total}=regSplit(TAB);
   const label=(TABS.find(t=>t.k===TAB)||{}).t||'';
   const src=rowsOf(TAB);
+  if(isPhone()&&total){ $wrap().innerHTML=mobOverview(); wireRegCards(); return; }
   if(!total){
     $wrap().innerHTML=`<div class="dsec"><div class="dhead"><h3>${esc(label)}</h3></div>
       <div class="hint">Nothing in this register${PROJ?' for '+esc(projName(PROJ)):''} yet.</div></div>`;
@@ -3605,6 +3662,7 @@ function start(){
   $('app').classList.add('on');
   $('who').textContent=(ME&&ME.name)||((SESSION.user&&SESSION.user.email)||'').split('@')[0];
   SORT={k:COLS[TAB][0].k,dir:1};
+  VIEW='dash';
   paint();
   try{ startLive(); }catch(e){ console.warn('Live updates unavailable',e); }
 }
