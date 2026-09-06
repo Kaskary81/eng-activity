@@ -663,6 +663,35 @@ table.g tbody tr:hover .openb{color:var(--ink2)}
 /* the Client's grade letter inside a status pill */
 .pill .grade{font-size:10px;font-weight:800;line-height:1;padding:2px 4px;border-radius:4px;
   background:currentColor;color:var(--surface);margin-right:1px}
+
+/* the phone register */
+.mlist{display:flex;flex-direction:column;gap:9px;padding-bottom:6px}
+.mcard{background:var(--surface);border:1px solid var(--ring);border-radius:13px;
+  padding:11px 13px;cursor:pointer;transition:border-color .15s}
+.mcard:active{border-color:var(--accent)}
+.mcard.late{border-left:3px solid var(--critical)}
+.mref{font-family:var(--mono);font-size:10.5px;color:var(--ink3);margin-bottom:3px;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mtitle2{font-size:13.5px;color:var(--ink);line-height:1.32;margin-bottom:7px}
+.mmeta{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.mbits{font-size:11px;color:var(--ink3)}
+.mdates{display:flex;gap:14px;margin-top:8px;padding-top:7px;border-top:1px solid var(--line);
+  font-size:11px;color:var(--ink2);flex-wrap:wrap}
+.mdates i{display:block;font-style:normal;font-size:9px;text-transform:uppercase;
+  letter-spacing:.06em;color:var(--ink3)}
+.mlate{margin-top:6px;font-size:10.5px;color:var(--critical)}
+/* the toolbar has to fit a phone */
+@media (max-width:760px){
+  #tools{gap:6px}
+  #tools .btn{padding:7px 10px;font-size:12px}
+  #tools .f{min-width:0;flex:1 1 100%;max-width:none}
+  #tools .btn[id="csv"],#tools .btn[id="pdf"],#tools .btn[id="wrapb"],
+  #tools .btn[id="filld"],#tools .btn[id="frb"]{display:none}
+  .count{width:100%;text-align:right}
+  header{padding:10px 12px 0}
+  .projrow{gap:8px}
+  .proj{min-width:150px;padding:9px 12px}
+}
 </style>
 <script>
 (()=>{ let t=null; try{ t=localStorage.getItem('eng_theme'); }catch(e){}
@@ -717,7 +746,7 @@ table.g tbody tr:hover .openb{color:var(--ink2)}
 <script>
 const SB_URL='https://ivmmnsjiekhjxkhllncb.supabase.co';
 const SB_KEY='sb_publishable_RTHsaxZXVmRBQziLbFJX8g_PAaZzIbF';
-const BUILD='ENG 2026-09-06 · e43';
+const BUILD='ENG 2026-09-06 · e44';
 
 let SESSION=null, ME=null;
 let PROJECTS=[], PEOPLE=[], AB=[], SD=[], GIS=[], HIST=[], INV=[];
@@ -1450,12 +1479,30 @@ function paintMore(){
        ['late','Overdue','Everything past its date']].map(([v,t,d])=>
       `<article class="lcard" data-mv="${v}"><div class="lc-top"><b>${t}</b></div>
         <div class="lc-meta">${d}</div></article>`).join('')}
+    <article class="lcard" data-mact="csv"><div class="lc-top"><b>Export CSV</b></div>
+      <div class="lc-meta">This register, as it is filtered</div></article>
+    <article class="lcard" data-mact="pdf"><div class="lc-top"><b>Print</b></div>
+      <div class="lc-meta">A report of what is on screen</div></article>
+    <article class="lcard" data-mact="find"><div class="lc-top"><b>Find and replace</b></div>
+      <div class="lc-meta">Across the rows currently shown</div></article>
+    <article class="lcard" data-mact="alerts"><div class="lc-top"><b>Alerts and sound</b></div>
+      <div class="lc-meta">The chime and desktop alerts</div></article>
+    <article class="lcard" data-mact="theme"><div class="lc-top"><b>Light or dark</b></div>
+      <div class="lc-meta">Remembered on this phone</div></article>
     <article class="lcard"><div class="lc-top"><b>Signed in</b></div>
       <div class="lc-meta">${esc((ME&&ME.name)||'')} · ${esc((ME&&ME.role)||'')}</div></article>
     <article class="lcard" id="mout"><div class="lc-top"><b>Sign out</b></div></article>
     <article class="lcard"><div class="lc-meta">${esc(BUILD)}</div></article>
   </div>`;
   $wrap().querySelectorAll('[data-mv]').forEach(el=>el.onclick=()=>goView(el.dataset.mv));
+  $wrap().querySelectorAll('[data-mact]').forEach(el=>el.onclick=()=>{
+    const a=el.dataset.mact;
+    if(a==='csv')exportCSV();
+    else if(a==='pdf'){ goView('reg'); setTimeout(()=>exportPDF(),150); }
+    else if(a==='find'){ goView('reg'); setTimeout(()=>findReplaceBox(),150); }
+    else if(a==='alerts')alertsBox();
+    else if(a==='theme')toggleTheme();
+  });
   $('mout').onclick=()=>{try{localStorage.removeItem('eng-session');}catch(e){}location.reload();};
 }
 
@@ -2570,6 +2617,36 @@ document.addEventListener('paste',e=>{
   if(t){ e.preventDefault(); pasteInto(t); }
 });
 
+
+/* ============================================================
+   The phone gets cards, not a squeezed spreadsheet: the document
+   number, what it is, where it stands, and the dates that matter.
+   ============================================================ */
+const isPhone=()=>window.matchMedia('(max-width:760px)').matches;
+function cardsHTML(rows,cols){
+  if(!rows.length)return '<div class="empty"><b>Nothing matches</b>Try a different search or filter.</div>';
+  const F=k=>cols.find(c=>c.k===k);
+  return `<div class="mlist">${rows.map(r=>{
+    const st=r.review_status||r.status||'';
+    const title=r.description||r.doc_no||r.submittal_no||('#'+r.id);
+    const ref=r.doc_no||r.submittal_no||'';
+    const bits=[r.discipline,r.zone].filter(Boolean).join(' · ');
+    const dates=[
+      r.planned_date?['Planned',dayShort(r.planned_date)]:null,
+      r.submitted_date?['Sent',dayShort(r.submitted_date)]:null,
+      r.received_date?['Back',dayShort(r.received_date)]:null
+    ].filter(Boolean);
+    const late=r.planned_date&&r.planned_date<today&&!r.submitted_date;
+    return `<div class="mcard${late?' late':''}" data-open="${r.id}">
+      ${ref?`<div class="mref">${esc(ref)}</div>`:''}
+      <div class="mtitle2">${esc(title)}</div>
+      <div class="mmeta">${st?pill(st):''}${bits?`<span class="mbits">${esc(bits)}</span>`:''}</div>
+      ${dates.length?`<div class="mdates">${dates.map(([k,v])=>
+        `<span><i>${k}</i>${esc(v)}</span>`).join('')}</div>`:''}
+      ${late?'<div class="mlate">past its planned date</div>':''}
+    </div>`;}).join('')}</div>`;
+}
+
 function paintTable(){
 
   const cols=COLS[TAB], rows=rowsNow();
@@ -2589,6 +2666,13 @@ function paintTable(){
   const fcls=i=>i<fz?(' frz'+(i===fz-1?' frzlast':'')):'';
   const fsty=i=>i<fz?`left:${frozenLeft(vcols,i)}px;`:'';
   GRIDROWS=rows; GRIDCOLS=vcols;
+  if(isPhone()&&!PAINT_TARGET){
+    $wrap().innerHTML=cardsHTML(rows,vcols);
+    $wrap().querySelectorAll('[data-open]').forEach(el=>
+      el.onclick=()=>openSheet(+el.dataset.open));
+    const c=$('count'); if(c)c.textContent=rows.length+' of '+rowsOf(TAB).length;
+    return;
+  }
   /* the same rows redrawn should not re-animate */
   const sig=TAB+'|'+rows.length+'|'+rows.map(r=>r.id).join(',');
   ANIMATE=(sig!==_lastSig); _lastSig=sig;
