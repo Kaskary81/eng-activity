@@ -877,8 +877,6 @@ table.g tbody tr:hover .openb{color:var(--ink2)}
 /* the card coming apart */
 .shatter{position:fixed;inset:0;z-index:8500;pointer-events:none}
 .shatter.gone{opacity:0;transition:opacity .25s}
-.shatter .shard{position:fixed;overflow:hidden;box-sizing:border-box;
-  will-change:transform,filter;transition:filter .12s linear}
 .shatter .shard.landed{transition:filter .3s ease}
 .mcard.cracked,.mkpi .kpi.cracked{opacity:0}
 .mcard.remade,.mkpi .kpi.remade{animation:remade .28s var(--spring) both}
@@ -894,6 +892,14 @@ table.g tbody tr:hover .openb{color:var(--ink2)}
 body.breaking,body.breaking *{user-select:none!important;-webkit-user-select:none!important;
   -webkit-touch-callout:none}
 .shatter,.shatter *{user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
+
+/* a piece is a slab: the face sits on stacked edge layers */
+.shatter .shard{position:fixed;overflow:visible;box-sizing:border-box;
+  will-change:transform,filter;transition:filter .12s linear}
+.shatter .sface,.shatter .sedge{position:fixed;box-sizing:border-box;overflow:hidden;
+  pointer-events:none}
+.shatter .sedge{z-index:0}
+.shatter .sface{z-index:1}
 </style>
 <script>
 (()=>{ let t=null; try{ t=localStorage.getItem('eng_theme'); }catch(e){}
@@ -951,7 +957,7 @@ body.breaking,body.breaking *{user-select:none!important;-webkit-user-select:non
 <script>
 const SB_URL='https://ivmmnsjiekhjxkhllncb.supabase.co';
 const SB_KEY='sb_publishable_RTHsaxZXVmRBQziLbFJX8g_PAaZzIbF';
-const BUILD='ENG 2026-09-06 · e67';
+const BUILD='ENG 2026-09-06 · e68';
 
 let SESSION=null, ME=null;
 let PROJECTS=[], PEOPLE=[], AB=[], SD=[], GIS=[], HIST=[], INV=[];
@@ -2944,10 +2950,29 @@ function armRestore(){
     document.addEventListener('pointerdown',onTap,true);
   }
 }
+/* the colour of a cut edge: the card's own surface, darkened. A card with no
+   background of its own takes the colour of whatever it sits on, so the edge
+   is never a black wedge on a navy page. */
+function paintedColour(el){
+  let n=el;
+  while(n&&n!==document.documentElement){
+    const c=getComputedStyle(n).backgroundColor;
+    if(c&&!/rgba\(0,\s*0,\s*0,\s*0\)|transparent/.test(c))return c;
+    n=n.parentElement;
+  }
+  return 'rgb(34,44,77)';
+}
+function shade(col,amt){
+  const m=/rgba?\((\d+),\s*(\d+),\s*(\d+)/.exec(col||'');
+  if(!m)return 'rgb(20,26,46)';
+  const f=v=>Math.max(0,Math.round(+v*(1-amt)));
+  return `rgb(${f(m[1])},${f(m[2])},${f(m[3])})`;
+}
 function shatter(el,then){
   if(window.matchMedia('(prefers-reduced-motion:reduce)').matches){ if(then)then(); return; }
   if(el.classList.contains('cracked'))return;     /* already in pieces */
   const r=el.getBoundingClientRect(), cs=getComputedStyle(el);
+  const surface=paintedColour(el);         /* what the piece is actually made of */
   const N=7;
   /* the shelves the pieces can land on: the top edge of every other card
      below this one, and the bottom of the screen */
@@ -2972,15 +2997,31 @@ function shatter(el,then){
   const pieces=[];
   for(let i=0;i<N;i++){
     const p1=rim[i], p2=rim[(i+1)%N];
+    const clip=`polygon(${cx}% ${cy}%, ${p1[0]}% ${p1[1]}%, ${p2[0]}% ${p2[1]}%)`;
+    const box=`left:${r.left}px;top:${r.top}px;width:${r.width}px;height:${r.height}px;`;
     const d=document.createElement('div');
     d.className='shard';
-    d.style.cssText=`left:${r.left}px;top:${r.top}px;width:${r.width}px;height:${r.height}px;`+
-      `background:${cs.backgroundColor};border-radius:${cs.borderRadius};padding:${cs.padding};`+
-      `border:${cs.border};box-shadow:${cs.boxShadow};`+
+    d.style.cssText=box;
+    /* THE THICKNESS. A card is a slab, not a sheet, so each piece is drawn
+       twice: a dark side face a few pixels below and behind, and the printed
+       face on top of it. The gap between them is what reads as depth. */
+    const T=Math.max(5,Math.min(11,r.height*0.07));      /* how thick the card is */
+    for(let k=T;k>=1;k--){
+      const edge=document.createElement('div');
+      edge.className='sedge';
+      edge.style.cssText=box+`clip-path:${clip};background:${shade(surface,0.42-k*0.018)};`+
+        `border-radius:${cs.borderRadius};transform:translate(${(k*0.55).toFixed(1)}px,${k.toFixed(1)}px);`;
+      d.appendChild(edge);
+    }
+    const face=document.createElement('div');
+    face.className='sface';
+    face.style.cssText=box+
+      `background:${surface};border-radius:${cs.borderRadius};padding:${cs.padding};`+
       `font:${cs.font};color:${cs.color};text-align:${cs.textAlign};`+
       `letter-spacing:${cs.letterSpacing};line-height:${cs.lineHeight};`;
-    d.style.clipPath=`polygon(${cx}% ${cy}%, ${p1[0]}% ${p1[1]}%, ${p2[0]}% ${p2[1]}%)`;
-    d.innerHTML=el.innerHTML;
+    face.style.clipPath=clip;
+    face.innerHTML=el.innerHTML;
+    d.appendChild(face);
     stage.appendChild(d);
     /* thrown away from the point of impact, with a little lift */
     const mx=((p1[0]+p2[0])/2-cx), my=((p1[1]+p2[1])/2-cy);
