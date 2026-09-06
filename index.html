@@ -53,10 +53,7 @@
 html,body{height:100%;margin:0}
 body{
   font:14.5px/1.5 ui-sans-serif,-apple-system,"Segoe UI",Roboto,sans-serif;color:var(--ink);
-  background:
-    radial-gradient(1100px 620px at 12% -10%, rgba(42,120,214,.22), transparent 60%),
-    radial-gradient(900px 520px at 88% 0%,  rgba(42,120,214,.16), transparent 62%),
-    linear-gradient(180deg,var(--page1),var(--page2) 60%);
+  background:radial-gradient(1200px 700px at 20% 0%,var(--page1),var(--page2));
   background-attachment:fixed;overflow:hidden}
 button,input,select,textarea{font:inherit;color:inherit}
 button{background:none;border:0;cursor:pointer}
@@ -139,15 +136,10 @@ h1 small{display:block;font-size:10.5px;font-weight:700;letter-spacing:.1em;
 
 /* table */
 .wrap{flex:1;overflow:auto;padding:0 22px 90px}
-table.g{width:max-content;min-width:100%;border-collapse:separate;border-spacing:0;font-size:12.5px;
-  table-layout:fixed}
-table.g th{position:sticky;top:0;z-index:3;text-align:left;padding:8px 10px;font-size:10.5px;
-  font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--ink2);
-  background:linear-gradient(180deg,var(--surface2),var(--card2));border-bottom:1px solid rgba(42,120,214,.22);
-  cursor:pointer;white-space:nowrap}
+table.g{border-collapse:separate;border-spacing:0;font-size:12px;table-layout:fixed;width:100%}
+table.g th{position:sticky;top:0;z-index:4;text-align:left;padding:6px 8px;font-size:11px;font-weight:600;color:var(--ink2);background:var(--surface2);border-bottom:1px solid var(--grid);user-select:none;cursor:pointer;white-space:nowrap}
 table.g th:hover{color:var(--accent)}
-table.g td{padding:8px 10px;border-bottom:1px solid var(--grid,#2b1f47);color:var(--ink2);
-  vertical-align:middle;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+table.g td{border-right:1px solid var(--grid);border-bottom:1px solid var(--grid);padding:4px 7px;text-align:left;vertical-align:top;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;background:var(--surface)}
 table.g tbody tr{animation:rise .35s var(--ease) both}
 table.g tbody tr:nth-child(even) td{background:var(--card2)}
 table.g tbody tr:hover td{background:var(--chip)}
@@ -181,8 +173,7 @@ td.wrapc{white-space:normal;line-height:1.45;unicode-bidi:plaintext}
 
 /* login */
 #login{position:fixed;inset:0;z-index:80;display:none;place-items:center;padding:20px;
-  background:radial-gradient(900px 500px at 50% 0%,rgba(42,120,214,.25),transparent 65%),
-             linear-gradient(180deg,var(--page1),var(--page2))}
+  background:linear-gradient(180deg,var(--page1),var(--page2))}
 #login.on{display:grid}
 #login .box{width:min(400px,100%);border:1px solid rgba(42,120,214,.25);border-radius:22px;padding:30px;
   background:linear-gradient(180deg,var(--surface),var(--surface));
@@ -448,6 +439,16 @@ table.g th.frzlast,table.g td.frzlast{border-right:2px solid var(--accent)}
 .regbar100{margin-top:12px}
 .legtot{margin-top:9px;font-size:12.5px;color:var(--ink3)}
 .legtot .bad{color:var(--critical)}
+
+/* the row hover and the status line, as in the LOD */
+table.g tbody tr:hover td{background:var(--surface2)}
+#statusline{height:26px;display:flex;align-items:center;gap:14px;padding:0 14px;
+  border-top:1px solid var(--ring);background:var(--surface);color:var(--ink3);
+  font-size:11.5px;white-space:nowrap;overflow:hidden}
+#statusline .dot{width:7px;height:7px;border-radius:50%;background:var(--good);
+  display:inline-block;margin-right:5px}
+#statusline b{color:var(--ink2);font-weight:600}
+#statusline .sp{margin-left:auto}
 </style>
 <script>
 (()=>{ let t=null; try{ t=localStorage.getItem('eng_theme'); }catch(e){}
@@ -467,6 +468,7 @@ table.g th.frzlast,table.g td.frzlast{border-right:2px solid var(--accent)}
   </div>
 </div>
 
+<div id="statusline" style="display:none"></div>
 <div id="app">
   <div id="topbar">
     <div class="mark"></div>
@@ -496,7 +498,7 @@ table.g th.frzlast,table.g td.frzlast{border-right:2px solid var(--accent)}
 <script>
 const SB_URL='https://ivmmnsjiekhjxkhllncb.supabase.co';
 const SB_KEY='sb_publishable_RTHsaxZXVmRBQziLbFJX8g_PAaZzIbF';
-const BUILD='ENG 2026-08-31 · e17';
+const BUILD='ENG 2026-08-31 · e18';
 
 let SESSION=null, ME=null;
 let PROJECTS=[], PEOPLE=[], AB=[], SD=[], GIS=[], HIST=[], INV=[];
@@ -1343,6 +1345,20 @@ function toggleTheme(){
   toast(t==='dark'?'Dark':'Light');
 }
 
+
+/* the line along the bottom, as the LOD has: what is loaded and who you are */
+function paintStatus(){
+  const el=document.getElementById('statusline'); if(!el)return;
+  const n=rowsOf(TAB).length, label=(TABS.find(t=>t.k===TAB)||{}).t||'';
+  const late=(typeof overdueList==='function')?overdueList().length:0;
+  el.innerHTML=`<span><span class="dot"></span>live</span>`+
+    `<span><b>${n}</b> ${esc(String(label).toLowerCase())}</span>`+
+    `<span><b>${PROJ?esc(projName(PROJ)):'All projects'}</b></span>`+
+    (late?`<span><b>${late}</b> overdue</span>`:'')+
+    `<span class="sp">${ME?esc(ME.name)+' · ':''}build ${esc(BUILD)}</span>`;
+  el.style.display='flex';
+}
+
 function paintTable(){
 
   const cols=COLS[TAB], rows=rowsNow();
@@ -1530,6 +1546,7 @@ function wireDaily(){
     DAYS_BACK=+b.dataset.days; paintTable();});
 }
 function paint(){
+  try{ paintStatus(); }catch(e){}
   paintNav();
   const fab=$('fab');
   if(fab)fab.style.display=(VIEW==='reg'&&canEdit())?'':'none';
