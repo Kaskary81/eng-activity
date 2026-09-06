@@ -36,19 +36,21 @@
 }
 :root[data-theme="dark"]{
   color-scheme:dark;
-  --page1:#101216; --page2:#0b0c0f;
-  --glass:rgba(26,26,25,.94); --surface:#1a1a19; --surface2:#2c2c2a; --field:#111110;
-  --card:#1a1a19; --card2:#2c2c2a; --chip:#2c2c2a;
-  --ink:#ffffff; --ink2:#c3c2b7; --ink3:#898781; --muted:#898781;
-  --line:#2c2c2a; --line2:#3a3a37; --grid:#2c2c2a; --ring:rgba(255,255,255,.10);
-  --accent:#3987e5; --accent-soft:rgba(57,135,229,.14); --accent-soft2:rgba(57,135,229,.22);
-  --violet:#3987e5; --violet2:#2a6fc4; --vsoft:rgba(57,135,229,.14);
-  --good:#0ca30c; --warn:#fab219; --serious:#ec835a; --critical:#d03b3b;
-  --hot:#d03b3b; --sky:#3987e5; --orange:#ec835a; --goodtext:#0ca30c;
-  --sel:rgba(57,135,229,.20); --selb:#3987e5;
-  --shadow:0 10px 34px rgba(0,0,0,.5),0 2px 8px rgba(0,0,0,.4);
-  --shadow-focus:0 18px 50px rgba(0,0,0,.65),0 3px 10px rgba(0,0,0,.45);
+  /* Deep navy, cards a shade lighter, one blue accent with amber beside it. */
+  --page1:#131c33; --page2:#0d1424;
+  --glass:rgba(27,36,64,.94); --surface:#1b2440; --surface2:#222c4d; --field:#161e36;
+  --card:#1b2440; --card2:#222c4d; --chip:#26304d;
+  --ink:#ffffff; --ink2:#9fabc9; --ink3:#6f7c9c; --muted:#6f7c9c;
+  --line:#26304d; --line2:#313c60; --grid:#26304d; --ring:rgba(255,255,255,.08);
+  --accent:#3b6cf6; --violet:#3b6cf6; --violet2:#2f57cc;
+  --accent-soft:rgba(59,108,246,.16); --accent-soft2:rgba(59,108,246,.26); --vsoft:rgba(59,108,246,.16);
+  --good:#3ecf8e; --warn:#f4c430; --serious:#f0873b; --critical:#f0616e;
+  --hot:#f0616e; --sky:#3b6cf6; --orange:#f0873b; --goodtext:#3ecf8e;
+  --sel:rgba(59,108,246,.22); --selb:#3b6cf6;
+  --shadow:0 14px 40px rgba(5,10,25,.55),0 2px 8px rgba(5,10,25,.45);
+  --shadow-focus:0 22px 60px rgba(5,10,25,.7),0 3px 12px rgba(5,10,25,.5);
 }
+
 
 html,body{height:100%;margin:0}
 body{
@@ -605,7 +607,7 @@ table.g tbody tr:hover .openb{color:var(--ink2)}
 <script>
 const SB_URL='https://ivmmnsjiekhjxkhllncb.supabase.co';
 const SB_KEY='sb_publishable_RTHsaxZXVmRBQziLbFJX8g_PAaZzIbF';
-const BUILD='ENG 2026-09-06 · e34';
+const BUILD='ENG 2026-09-06 · e35';
 
 let SESSION=null, ME=null;
 let PROJECTS=[], PEOPLE=[], AB=[], SD=[], GIS=[], HIST=[], INV=[];
