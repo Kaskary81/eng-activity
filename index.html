@@ -834,6 +834,11 @@ table.g tbody tr:hover .openb{color:var(--ink2)}
 .iconb.bell .bdot{position:absolute;top:2px;right:2px;background:var(--critical);color:#fff;
   border-radius:9px;font-size:9px;font-style:normal;padding:0 4px;line-height:13px;font-weight:700}
 @media (max-width:760px){ #topbar{align-items:center} .iconb.bell{margin-left:auto} }
+
+@media (max-width:760px){
+  /* windows are a desktop idea; a phone has one screen */
+  #winbtn,#tidybtn,#desktop,#dock,#snapghost{display:none!important}
+}
 </style>
 <script>
 (()=>{ let t=null; try{ t=localStorage.getItem('eng_theme'); }catch(e){}
@@ -891,7 +896,7 @@ table.g tbody tr:hover .openb{color:var(--ink2)}
 <script>
 const SB_URL='https://ivmmnsjiekhjxkhllncb.supabase.co';
 const SB_KEY='sb_publishable_RTHsaxZXVmRBQziLbFJX8g_PAaZzIbF';
-const BUILD='ENG 2026-09-06 · e54';
+const BUILD='ENG 2026-09-06 · e55';
 
 let SESSION=null, ME=null;
 let PROJECTS=[], PEOPLE=[], AB=[], SD=[], GIS=[], HIST=[], INV=[];
@@ -2444,6 +2449,7 @@ function dragEnd(){
 window.addEventListener('resize',()=>WINS.forEach(w=>applyRect(w)));
 /* open whatever is on screen as a window */
 function openCurrentAsWindow(){
+  if(isPhone())return;          /* one screen at a time on a phone */
   if(VIEW==='reg')      openRegisterWindow(TAB);
   else if(VIEW==='dash')openDashWindow();
   else if(VIEW==='plan')openPlanWindow();
