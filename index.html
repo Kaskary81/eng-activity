@@ -889,6 +889,11 @@ table.g tbody tr:hover .openb{color:var(--ink2)}
 .mkpi .kpi[data-rstate]{position:relative;-webkit-tap-highlight-color:transparent}
 .mkpi .kpi.cracked{opacity:0}
 .mkpi .kpi.remade{animation:remade .26s var(--spring) both}
+
+/* while anything is in pieces, nothing on the page selects */
+body.breaking,body.breaking *{user-select:none!important;-webkit-user-select:none!important;
+  -webkit-touch-callout:none}
+.shatter,.shatter *{user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
 </style>
 <script>
 (()=>{ let t=null; try{ t=localStorage.getItem('eng_theme'); }catch(e){}
@@ -946,7 +951,7 @@ table.g tbody tr:hover .openb{color:var(--ink2)}
 <script>
 const SB_URL='https://ivmmnsjiekhjxkhllncb.supabase.co';
 const SB_KEY='sb_publishable_RTHsaxZXVmRBQziLbFJX8g_PAaZzIbF';
-const BUILD='ENG 2026-09-06 · e66';
+const BUILD='ENG 2026-09-06 · e67';
 
 let SESSION=null, ME=null;
 let PROJECTS=[], PEOPLE=[], AB=[], SD=[], GIS=[], HIST=[], INV=[];
@@ -2912,21 +2917,36 @@ function wireCardHold(){
    beneath them — each one carrying a shadow that tightens as it lands.
    They stay where they fall until the screen is pressed.
    ============================================================ */
-let SHARDS=null;
+/* every break that is still lying on the screen */
+let SHARDS=[];
 function clearShards(){
-  if(!SHARDS)return;
-  const {stage,card,raf}=SHARDS;
-  cancelAnimationFrame(raf);
-  stage.classList.add('gone');
-  setTimeout(()=>stage.remove(),260);
-  if(card){ card.classList.remove('cracked'); card.style.visibility='';
-    card.classList.add('remade');
-    setTimeout(()=>card.classList.remove('remade'),280); }
-  SHARDS=null;
+  if(!SHARDS.length)return;
+  SHARDS.forEach(({stage,card,raf})=>{
+    cancelAnimationFrame(raf);
+    stage.classList.add('gone');
+    setTimeout(()=>stage.remove(),260);
+    if(card){ card.classList.remove('cracked'); card.style.visibility='';
+      card.classList.add('remade');
+      setTimeout(()=>card.classList.remove('remade'),280); }
+  });
+  SHARDS=[];
+  document.body.classList.remove('breaking');
+}
+/* a double tap anywhere puts every broken card back together */
+let _lastTap=0;
+function armRestore(){
+  const onTap=e=>{
+    const now=Date.now();
+    if(now-_lastTap<380){ _lastTap=0; clearShards(); }
+    else _lastTap=now;
+  };
+  if(!armRestore._on){ armRestore._on=true;
+    document.addEventListener('pointerdown',onTap,true);
+  }
 }
 function shatter(el,then){
   if(window.matchMedia('(prefers-reduced-motion:reduce)').matches){ if(then)then(); return; }
-  clearShards();
+  if(el.classList.contains('cracked'))return;     /* already in pieces */
   const r=el.getBoundingClientRect(), cs=getComputedStyle(el);
   const N=7;
   /* the shelves the pieces can land on: the top edge of every other card
@@ -3012,17 +3032,16 @@ function shatter(el,then){
       p.el.style.transform=`translate(${p.x.toFixed(1)}px,${p.y.toFixed(1)}px) rotate(${p.rot.toFixed(1)}deg)`;
       p.el.style.filter=`drop-shadow(0 ${(4+h*14).toFixed(1)}px ${(6+h*16).toFixed(1)}px rgba(0,0,0,${(0.5-h*0.22).toFixed(2)}))`;
     }
-    if(moving)SHARDS.raf=requestAnimationFrame(step);
+    if(moving)me.raf=requestAnimationFrame(step);
   };
   el.classList.add('cracked');
   el.style.visibility='hidden';          /* the whole card goes, not just a layer */
   if(navigator.vibrate)navigator.vibrate([9,28,14]);
-  SHARDS={stage,card:el,raf:requestAnimationFrame(step)};
-  /* they stay put; the next press anywhere puts the card back together */
-  setTimeout(()=>{
-    document.addEventListener('pointerdown',clearShards,{once:true});
-    document.addEventListener('touchstart',clearShards,{once:true});
-  },80);
+  const me={stage,card:el,raf:0};
+  SHARDS.push(me);
+  document.body.classList.add('breaking');
+  me.raf=requestAnimationFrame(step);
+  armRestore();          /* they stay until a double tap brings them all back */
   if(then)then();
 }
 
