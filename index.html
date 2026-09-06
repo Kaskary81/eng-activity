@@ -625,6 +625,40 @@ table.g tbody tr:hover .openb{color:var(--ink2)}
 .btrack{height:10px}
 .bmore{font-size:10.5px;color:var(--ink3);padding:4px 2px 0}
 .legend{font-size:9.5px;margin-top:6px}
+
+/* the dashboard as the LOD lays it out: full-width sections */
+.dsec{background:var(--surface);border:1px solid var(--ring);border-radius:14px;
+  padding:14px 16px;margin-bottom:12px}
+.dhead{display:flex;align-items:baseline;gap:10px;margin-bottom:10px}
+.dhead h3{margin:0;font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--ink2)}
+.dhead span{font-size:11.5px;color:var(--ink3)}
+.dbar{display:flex;height:30px;border-radius:8px;overflow:hidden;background:var(--chip)}
+.dbar i{display:flex;align-items:center;justify-content:center;min-width:2px;cursor:pointer}
+.dbar i b{color:#fff;font-size:12px;font-weight:700}
+.dchips{display:flex;flex-wrap:wrap;gap:7px;margin-top:10px}
+.dchip{display:inline-flex;align-items:center;gap:6px;background:var(--chip);
+  border:1px solid var(--ring);border-radius:20px;padding:3px 11px;font-size:11.5px;
+  color:var(--ink2);cursor:pointer}
+.dchip:hover{border-color:var(--accent);color:var(--ink)}
+.dchip i{width:9px;height:9px;border-radius:50%}
+.dchip b{color:var(--ink)}
+.dnote{margin-top:8px;font-size:11px;color:var(--ink3)}
+.drow{display:flex;align-items:center;gap:10px;margin:4px 0}
+.dlab{width:150px;flex:none;font-size:11.5px;color:var(--ink2);overflow:hidden;
+  text-overflow:ellipsis;white-space:nowrap;text-transform:uppercase;letter-spacing:.03em}
+.dtrack{display:flex;height:13px;border-radius:7px;overflow:hidden;background:var(--chip);min-width:2px}
+.dtrack i{cursor:pointer}
+.dn{width:38px;text-align:right;font-size:12px;color:var(--ink);font-weight:600}
+.dp{width:42px;text-align:right;font-size:11px;color:var(--ink3)}
+.dtbl{width:100%;border-collapse:collapse;font-size:12px}
+.dtbl th{text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:.05em;
+  color:var(--ink3);padding:4px 8px;border-bottom:1px solid var(--line)}
+.dtbl td{padding:5px 8px;border-bottom:1px solid var(--line);color:var(--ink2)}
+.dtbl tr[data-open]{cursor:pointer}
+.dtbl tr:hover td{background:var(--chip)}
+.dtbl td.n{text-align:right}
+.dtbl td.late{color:var(--critical);font-weight:700}
+.dmore{font-size:11px;color:var(--ink3);padding-top:6px}
 </style>
 <script>
 (()=>{ let t=null; try{ t=localStorage.getItem('eng_theme'); }catch(e){}
@@ -679,7 +713,7 @@ table.g tbody tr:hover .openb{color:var(--ink2)}
 <script>
 const SB_URL='https://ivmmnsjiekhjxkhllncb.supabase.co';
 const SB_KEY='sb_publishable_RTHsaxZXVmRBQziLbFJX8g_PAaZzIbF';
-const BUILD='ENG 2026-09-06 · e37';
+const BUILD='ENG 2026-09-06 · e38';
 
 let SESSION=null, ME=null;
 let PROJECTS=[], PEOPLE=[], AB=[], SD=[], GIS=[], HIST=[], INV=[];
@@ -2980,33 +3014,86 @@ function wireRegCards(){
 }
 
 function paintOverview(){
-  /* drawn below, then wired */
-  const ab=abFor(), gi=gisFor();
-  $wrap().innerHTML=`${heroPanel()}<div class="panels">
-    ${bars('As-builts by project', group(ab,r=>projName(r.project_id),r=>AB_DONE(r.status),
-        r=>r.project_id),'var(--hot)',{tab:'asbuilts',field:'project_id'})}
-    ${bars('As-builts by discipline', group(ab,r=>r.discipline,r=>AB_DONE(r.status)),
-        'var(--hot)',{tab:'asbuilts',field:'discipline'})}
-    ${bars('Shop drawings by project', group(sdFor(),r=>projName(r.project_id),
-        r=>GIS_OK(r.review_status),r=>r.project_id),'var(--hot)',{tab:'shop',field:'project_id'})}
-    ${bars('Shop drawings by review status', group(sdFor(),r=>r.review_status,
-        r=>GIS_OK(r.review_status),r=>r.review_status),'var(--warn)',{tab:'shop',field:'review_status'})}
-    ${bars('Shop drawings by zone', group(sdFor(),r=>r.zone,r=>GIS_OK(r.review_status),
-        r=>r.zone),'var(--hot)',{tab:'shop',field:'zone'})}
-    ${bars('GIS by project', group(gi,r=>projName(r.project_id),r=>GIS_OK(r.review_status),
-        r=>r.project_id),'var(--hot)',{tab:'gis',field:'project_id'})}
-    ${bars('As-builts by category', group(ab,r=>r.category,r=>AB_DONE(r.status),r=>r.category),
-        'var(--hot)',{tab:'asbuilts',field:'category'})}
-    ${dailyPanel()}
-    ${bars('Sections by invoice',
-        group(invFor(),r=>r.invoice_no?'Invoice '+r.invoice_no:'(no invoice)',
-          r=>r.status==='Submitted',r=>r.invoice_no).sort((a,b)=>a.k.localeCompare(b.k)),
-        'var(--sky)',{tab:'invoice',field:'invoice_no'})}
-    ${bars('Sections by method', group(invFor(),r=>r.method,r=>r.status==='Submitted',r=>r.method),
-        'var(--sky)',{tab:'invoice',field:'method'})}
-  </div>`;
-  wireDaily();
+  /* The LOD's shape: a few full-width sections, each one saying a whole
+     thing, rather than a grid of small panels. */
+  const {rows:states,total}=regSplit(TAB);
+  const label=(TABS.find(t=>t.k===TAB)||{}).t||'';
+  const src=rowsOf(TAB);
+
+  /* 1. what needs acting on — planned, past its date, still not sent */
+  const late=src.filter(r=>r.planned_date && r.planned_date<today &&
+      !(r.submitted_date&&r.submitted_date>=r.planned_date) &&
+      !GIS_OK(r.review_status))
+    .sort((a,b)=>(a.planned_date||'').localeCompare(b.planned_date||''));
+  const days=d=>Math.max(0,Math.round((new Date(today)-new Date(d))/864e5));
+  const lateSec = late.length ? `<div class="dsec">
+      <div class="dhead"><h3>Needs action</h3>
+        <span>${late.length} past the planned date and not yet sent</span></div>
+      <table class="dtbl"><thead><tr><th>Document</th><th>Planned</th>
+        <th class="n">Days late</th><th>With</th><th>Status</th></tr></thead>
+      <tbody>${late.slice(0,12).map(r=>`<tr data-open="${r.id}">
+        <td>${esc(r.description||r.doc_no||'—')}</td>
+        <td>${esc(dayShort(r.planned_date))}</td>
+        <td class="n late">${days(r.planned_date)}</td>
+        <td>${esc(r.action_by||'—')}</td>
+        <td>${esc(r.review_status||'—')}</td></tr>`).join('')}</tbody></table>
+      ${late.length>12?`<div class="dmore">and ${late.length-12} more</div>`:''}
+    </div>` : '';
+
+  /* 2. where everything stands — one bar, and a chip per state */
+  const stand = `<div class="dsec">
+      <div class="dhead"><h3>Where the ${total} ${esc(String(label).toLowerCase())} stand</h3>
+        <span>${PROJ?esc(projName(PROJ)):'all projects'}</span></div>
+      <div class="dbar">${states.filter(x=>x.n).map(x=>
+        `<i data-rstate="${esc(x.k)}" title="${esc(x.t)} — ${x.n}"
+            style="width:${x.n/(total||1)*100}%;background:${x.c}"><b>${x.n}</b></i>`).join('')}</div>
+      <div class="dchips">${states.map(x=>
+        `<span class="dchip" data-rstate="${esc(x.k)}"><i style="background:${x.c}"></i>
+          ${esc(x.t)} <b>${x.n}</b></span>`).join('')}</div>
+      <div class="dnote">Every record sits in exactly one of these. ${
+        states.reduce((t,x)=>t+x.n,0)} of ${total}.</div>
+    </div>`;
+
+  /* 3. the same split, by discipline — the LOD's "by discipline" section */
+  const discSec = discSection('discipline','By discipline',states);
+  const zoneSec = discSection('zone','By zone',states);
+
+  $wrap().innerHTML = stand + lateSec + discSec + zoneSec + dailyPanel();
 }
+/* one row per value, split by the same states, so the totals agree with the
+   bar above */
+function dayShort(d){
+  if(!d)return '—';
+  const x=new Date(d+'T00:00:00');
+  return isNaN(x)?String(d):x.toLocaleDateString('en-GB',{day:'2-digit',month:'short'});
+}
+function discSection(field,title,states){
+  const src=rowsOf(TAB);
+  const keys=[...new Set(src.map(r=>String(r[field]||'(not set)')))]
+    .map(k=>({k,n:src.filter(r=>String(r[field]||'(not set)')===k).length}))
+    .sort((a,b)=>b.n-a.n);
+  if(keys.length<2)return '';
+  const max=keys[0].n;
+  const seen=new Set();
+  const stateOf=r=>{ for(const st of states){ if(st.f(r))return st; } return states[states.length-1]; };
+  return `<div class="dsec">
+    <div class="dhead"><h3>${esc(title)}</h3><span>${keys.length} groups</span></div>
+    ${keys.slice(0,12).map(g=>{
+      const rows=src.filter(r=>String(r[field]||'(not set)')===g.k);
+      const parts=states.map(st=>({st,v:rows.filter(r=>stateOf(r)===st).length})).filter(p=>p.v);
+      const done=rows.filter(r=>stateOf(r)===states[0]).length;
+      return `<div class="drow">
+        <div class="dlab" title="${esc(g.k)}">${esc(g.k)}</div>
+        <div class="dtrack" style="width:${g.n/max*100}%">
+          ${parts.map(p=>`<i style="flex:${p.v};background:${p.st.c}"
+             data-rstate="${esc(p.st.k)}" title="${esc(p.st.t)} — ${p.v}"></i>`).join('')}
+        </div>
+        <div class="dn">${g.n}</div>
+        <div class="dp">${Math.round(done/g.n*100)}%</div></div>`;}).join('')}
+    ${keys.length>12?`<div class="dmore">and ${keys.length-12} more</div>`:''}
+  </div>`;
+}
+
 function wireDash(){
   document.querySelectorAll('[data-drill]').forEach(el=>{
     el.style.cursor='pointer';
@@ -3041,7 +3128,9 @@ function paint(){
   $('crumb').textContent   = onReg?'':VIEWLABEL[VIEW]||'';
   $('crumb').style.display = onReg?'none':'';
   if(onReg){ paintTabs(); paintKpis(); paintTools(); paintTable(); }
-  else if(VIEW==='dash'){ paintKpis(); paintOverview(); wireDash(); wireRegCards(); }
+  else if(VIEW==='dash'){ paintKpis(); paintOverview(); wireDash(); wireRegCards();
+    document.querySelectorAll('.dtbl tr[data-open]').forEach(tr=>
+      tr.onclick=()=>{ VIEW='reg'; paint(); openSheet(+tr.dataset.open); }); }
   else if(VIEW==='plan'){ paintPlan(); }
   else if(VIEW==='late'){ paintOverdue(); }
   else { paintMore(); }
