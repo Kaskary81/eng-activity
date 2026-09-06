@@ -746,7 +746,7 @@ table.g tbody tr:hover .openb{color:var(--ink2)}
 <script>
 const SB_URL='https://ivmmnsjiekhjxkhllncb.supabase.co';
 const SB_KEY='sb_publishable_RTHsaxZXVmRBQziLbFJX8g_PAaZzIbF';
-const BUILD='ENG 2026-09-06 · e44';
+const BUILD='ENG 2026-09-06 · e45';
 
 let SESSION=null, ME=null;
 let PROJECTS=[], PEOPLE=[], AB=[], SD=[], GIS=[], HIST=[], INV=[];
@@ -1109,8 +1109,11 @@ function openSheet(id){
       const dis=canEdit()?'':' disabled';
       const input =
         type==='area' ? `<textarea id="f-${k}"${dis}>${esc(v)}</textarea>`
-      : type==='sel'  ? `<select id="f-${k}"${dis}>${['',...opts].map(o=>
-            `<option${String(v)===o?' selected':''}>${esc(o)}</option>`).join('')}</select>`
+      : type==='sel'  ? (()=>{ /* worked out now, so it follows this project's client */
+            const list=liveOptions(k,opts);
+            const extra=(v&&!list.includes(v))?[v]:[];
+            return `<select id="f-${k}"${dis}>${['',...list,...extra].map(o=>
+              `<option${String(v)===o?' selected':''}>${esc(o)}</option>`).join('')}</select>`; })()
       : type==='date' ? `<input id="f-${k}" type="date" value="${esc(v)}"${dis}>`
       : type==='num'  ? `<input id="f-${k}" type="number" value="${esc(v)}"${dis}>`
       : (()=>{ const ch=colChoices(k);
