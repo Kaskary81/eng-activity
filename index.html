@@ -825,6 +825,15 @@ table.g tbody tr:hover .openb{color:var(--ink2)}
   /* 3. the live line is the taskbar's job on a desktop; on a phone it is noise */
   #statusline{display:none!important}
 }
+
+/* the bell, drawn rather than an emoji */
+.iconb.bell{color:var(--accent);position:relative;width:38px;height:38px;border-radius:12px;
+  display:flex;align-items:center;justify-content:center;border:0;background:none;cursor:pointer}
+.iconb.bell svg{width:20px;height:20px}
+.iconb.bell:active{transform:scale(.92);background:var(--accent-soft)}
+.iconb.bell .bdot{position:absolute;top:2px;right:2px;background:var(--critical);color:#fff;
+  border-radius:9px;font-size:9px;font-style:normal;padding:0 4px;line-height:13px;font-weight:700}
+@media (max-width:760px){ #topbar{align-items:center} .iconb.bell{margin-left:auto} }
 </style>
 <script>
 (()=>{ let t=null; try{ t=localStorage.getItem('eng_theme'); }catch(e){}
@@ -855,7 +864,10 @@ table.g tbody tr:hover .openb{color:var(--ink2)}
     <button class="tbbtn" id="winbtn" title="Open this view in a window — several can sit side by side">⧉ Window</button>
     <button class="tbbtn" id="tidybtn" title="Tidy the windows" style="display:none">▦ Arrange</button>
     <div class="grow"></div>
-    <button class="iconb" id="alerts" title="Alerts and sound">🔔</button>
+    <button class="iconb bell" id="alerts" title="Notifications"><svg viewBox="0 0 24 24"
+      fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"
+      stroke-linejoin="round"><path d="M18 8a6 6 0 1 0-12 0c0 6-2 7-2 7h16s-2-1-2-7"/>
+      <path d="M10.3 20a2 2 0 0 0 3.4 0"/></svg></button>
     <span class="who" id="who"></span>
     <button class="iconb" id="out" title="Sign out">⎋</button>
   </div>
@@ -879,7 +891,7 @@ table.g tbody tr:hover .openb{color:var(--ink2)}
 <script>
 const SB_URL='https://ivmmnsjiekhjxkhllncb.supabase.co';
 const SB_KEY='sb_publishable_RTHsaxZXVmRBQziLbFJX8g_PAaZzIbF';
-const BUILD='ENG 2026-09-06 · e53';
+const BUILD='ENG 2026-09-06 · e54';
 
 let SESSION=null, ME=null;
 let PROJECTS=[], PEOPLE=[], AB=[], SD=[], GIS=[], HIST=[], INV=[];
@@ -1745,29 +1757,41 @@ function tile(k,v,p,col,frac,go){
       `<div class="bar"><i style="width:${Math.max(0,Math.min(100,frac))}%;background:${col}"></i></div>`}</div>`;
 }
 function paintKpis(){
+  /* a project with none of a thing gets no card for it */
+  const has=t=>rowsOf(t).length>0;
   const ab=abFor(), gi=gisFor(), sd=sdFor();
   const sdOk=sd.filter(r=>GIS_OK(r.review_status)).length;
   const inv=invFor(), invDone=inv.filter(r=>r.status==='Submitted').length;
   const invM=inv.reduce((t,r)=>t+(+r.length_m||0),0);
   const abDone=ab.filter(r=>AB_DONE(r.status)).length;
   const giOk=gi.filter(r=>GIS_OK(r.review_status)).length;
-  $('kpis').innerHTML=
-    tile('As-builts submitted', ab.length?Math.round(abDone/ab.length*100)+'%':'—',
-      abDone+' of '+ab.length,'var(--good)', ab.length?abDone/ab.length*100:0,
-      'asbuilts|done|Submitted as-builts')+
-    tile('Not submitted', ab.length-abDone,'as-built drawings','var(--hot)',
-      ab.length?(ab.length-abDone)/ab.length*100:0,'asbuilts|open|As-builts not submitted')+
-    tile('Shop drawings approved', sdOk+' of '+sd.length,'submittals','var(--good)',
-      sd.length?sdOk/sd.length*100:0,'shop|done|Approved shop drawings')+
-    tile('Shop drawings outstanding', sd.length-sdOk,'not yet approved','var(--warn)',
-      sd.length?(sd.length-sdOk)/sd.length*100:0,'shop|open|Shop drawings not approved')+
-    tile('GIS approved', giOk+' of '+gi.length,'submittals','var(--good)',
-      gi.length?giOk/gi.length*100:0,'gis|done|Approved GIS submittals')+
-    tile('Sections invoiced', inv.length?Math.round(invDone/inv.length*100)+'%':'—',
-      invDone+' of '+inv.length+' · '+Math.round(invM).toLocaleString()+' m','var(--sky)',
-      inv.length?invDone/inv.length*100:0,'invoice|done|Invoiced sections')+
-    tile('Sections not invoiced', inv.length-invDone,'of '+inv.length+' sections','var(--orange)',
-      inv.length?(inv.length-invDone)/inv.length*100:0,'invoice|open|Sections not invoiced');
+  /* only the registers this project actually has */
+  const cards=[];
+  if(ab.length){
+    cards.push(tile('As-builts submitted', Math.round(abDone/ab.length*100)+'%',
+      abDone+' of '+ab.length,'var(--good)', abDone/ab.length*100,
+      'asbuilts|done|Submitted as-builts'));
+    if(ab.length-abDone)cards.push(tile('Not submitted', ab.length-abDone,'as-built drawings',
+      'var(--hot)',(ab.length-abDone)/ab.length*100,'asbuilts|open|As-builts not submitted'));
+  }
+  if(sd.length){
+    cards.push(tile('Shop drawings approved', sdOk+' of '+sd.length,'submittals','var(--good)',
+      sdOk/sd.length*100,'shop|done|Approved shop drawings'));
+    if(sd.length-sdOk)cards.push(tile('Shop drawings outstanding', sd.length-sdOk,'not yet approved',
+      'var(--warn)',(sd.length-sdOk)/sd.length*100,'shop|open|Shop drawings not approved'));
+  }
+  if(gi.length)cards.push(tile('GIS approved', giOk+' of '+gi.length,'submittals','var(--good)',
+      giOk/gi.length*100,'gis|done|Approved GIS submittals'));
+  if(inv.length){
+    cards.push(tile('Sections invoiced', Math.round(invDone/inv.length*100)+'%',
+      invDone+' of '+inv.length+(invM?' · '+Math.round(invM).toLocaleString()+' m':''),'var(--sky)',
+      invDone/inv.length*100,'invoice|done|Invoiced sections'));
+    if(inv.length-invDone)cards.push(tile('Sections not invoiced', inv.length-invDone,
+      'of '+inv.length+' sections','var(--orange)',
+      (inv.length-invDone)/inv.length*100,'invoice|open|Sections not invoiced'));
+  }
+  $('kpis').innerHTML=cards.join('');
+  $('kpis').style.display=cards.length?'':'none';
 }
 function paintTools(){
 
@@ -2179,7 +2203,10 @@ function unseenCount(){
 function paintBell(){
   const b=document.getElementById('alerts'); if(!b)return;
   const n=unseenCount();
-  b.innerHTML='🔔'+(n?`<i class="bdot">${n>99?'99+':n}</i>`:'');
+  let dot=b.querySelector('.bdot');
+  if(n){ if(!dot){ dot=document.createElement('i'); dot.className='bdot'; b.appendChild(dot); }
+         dot.textContent=n>99?'99+':n; }
+  else if(dot)dot.remove();
   b.title=n?(n+' new since you last looked'):'Notifications';
 }
 function feedBox(){
@@ -3451,6 +3478,7 @@ function wireRegCards(){
 function invSections(states){
   const src=rowsOf('invoice');
   if(!src.length)return '';
+  if(!src.some(r=>Number(r.length_m)>0))return '';   /* nothing measured, nothing to show */
   const m=r=>Number(r.length_m)||0;
   const isDone=r=>String(r.invoice_no||'').trim()!=='' ||
                   String(r.status||'').trim().toLowerCase()==='submitted';
@@ -3531,6 +3559,11 @@ function paintOverview(){
   const label=(TABS.find(t=>t.k===TAB)||{}).t||'';
   const src=rowsOf(TAB);
   if(isPhone()&&total){ $wrap().innerHTML=mobOverview(); wireRegCards(); return; }
+  if(isPhone()&&!total){
+    $wrap().innerHTML=`<div class="dsec"><div class="dhead"><h3>${esc(label)}</h3></div>
+      <div class="hint">Nothing in this register${PROJ?' for '+esc(projName(PROJ)):''} yet.</div></div>`;
+    return;
+  }
   if(!total){
     $wrap().innerHTML=`<div class="dsec"><div class="dhead"><h3>${esc(label)}</h3></div>
       <div class="hint">Nothing in this register${PROJ?' for '+esc(projName(PROJ)):''} yet.</div></div>`;
