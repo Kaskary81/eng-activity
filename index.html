@@ -896,8 +896,8 @@ body.breaking,body.breaking *{user-select:none!important;-webkit-user-select:non
 /* a piece is a slab: the face sits on stacked edge layers */
 .shatter .shard{position:fixed;overflow:visible;box-sizing:border-box;
   will-change:transform,filter;transition:filter .12s linear}
-.shatter .sface,.shatter .sedge{position:fixed;box-sizing:border-box;overflow:hidden;
-  pointer-events:none}
+.shatter .sface,.shatter .sedge{position:absolute;inset:0;box-sizing:border-box;
+  overflow:hidden;pointer-events:none}
 .shatter .sedge{z-index:0}
 .shatter .sface{z-index:1}
 </style>
@@ -957,7 +957,7 @@ body.breaking,body.breaking *{user-select:none!important;-webkit-user-select:non
 <script>
 const SB_URL='https://ivmmnsjiekhjxkhllncb.supabase.co';
 const SB_KEY='sb_publishable_RTHsaxZXVmRBQziLbFJX8g_PAaZzIbF';
-const BUILD='ENG 2026-09-06 · e71';
+const BUILD='ENG 2026-09-06 · e72';
 
 let SESSION=null, ME=null;
 let PROJECTS=[], PEOPLE=[], AB=[], SD=[], GIS=[], HIST=[], INV=[];
@@ -3009,13 +3009,13 @@ function shatter(el,then){
     for(let k=T;k>=1;k--){
       const edge=document.createElement('div');
       edge.className='sedge';
-      edge.style.cssText=box+`clip-path:${clip};background:${shade(surface,0.42-k*0.018)};`+
+      edge.style.cssText=`clip-path:${clip};background:${shade(surface,0.42-k*0.018)};`+
         `border-radius:${cs.borderRadius};transform:translate(${(k*0.55).toFixed(1)}px,${k.toFixed(1)}px);`;
       d.appendChild(edge);
     }
     const face=document.createElement('div');
     face.className='sface';
-    face.style.cssText=box+
+    face.style.cssText=
       `background:${surface};border-radius:${cs.borderRadius};padding:${cs.padding};`+
       `font:${cs.font};color:${cs.color};text-align:${cs.textAlign};`+
       `letter-spacing:${cs.letterSpacing};line-height:${cs.lineHeight};`;
