@@ -592,6 +592,39 @@ table.g tbody tr:hover .openb{color:var(--ink2)}
 .btrack i{transition:flex .4s var(--ease)}
 .brow{align-items:center}
 .panels{display:grid;grid-template-columns:repeat(auto-fit,minmax(330px,1fr));gap:14px}
+
+/* a tighter dashboard: it should fit a screen, not scroll for ever */
+.panel.hero{gap:20px;padding:14px 16px;border-radius:14px;margin-bottom:10px}
+.ring,.ring svg{width:112px;height:112px}
+.ring .rmid b{font-size:23px}
+.ring .rmid b small{font-size:11px}
+.ring .rmid span{font-size:9px}
+.ring .rsub2{font-size:10px;bottom:-6px}
+.hhead{margin-bottom:8px}
+.hhead h3{font-size:14px}
+.hstats{grid-template-columns:repeat(auto-fit,minmax(104px,1fr));gap:7px}
+.hstat{padding:7px 9px;border-radius:9px}
+.hstat .hn{font-size:17px}
+.hstat .hk{font-size:9px;margin-top:2px}
+.hstat .hp{font-size:10px}
+.hbar{height:8px;margin-top:9px}
+.hfoot{margin-top:8px;font-size:11px;gap:14px}
+.hfoot b{font-size:12px}
+/* the KPI strip across the top */
+#kpis{gap:8px}
+#kpis .kpi{padding:8px 11px;border-radius:11px}
+#kpis .kpi .k{font-size:9px}
+#kpis .kpi .v{font-size:19px;margin-top:1px}
+#kpis .kpi .p{font-size:10px}
+#kpis .kpi .bar{height:3px;margin-top:5px}
+/* the bar panels */
+.panels{grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:10px}
+.panel{padding:12px 14px;border-radius:13px}
+.panel h3{font-size:11.5px;margin:0 0 8px}
+.brow{margin:3px 0;font-size:11.5px}
+.btrack{height:10px}
+.bmore{font-size:10.5px;color:var(--ink3);padding:4px 2px 0}
+.legend{font-size:9.5px;margin-top:6px}
 </style>
 <script>
 (()=>{ let t=null; try{ t=localStorage.getItem('eng_theme'); }catch(e){}
@@ -646,7 +679,7 @@ table.g tbody tr:hover .openb{color:var(--ink2)}
 <script>
 const SB_URL='https://ivmmnsjiekhjxkhllncb.supabase.co';
 const SB_KEY='sb_publishable_RTHsaxZXVmRBQziLbFJX8g_PAaZzIbF';
-const BUILD='ENG 2026-09-06 · e36';
+const BUILD='ENG 2026-09-06 · e37';
 
 let SESSION=null, ME=null;
 let PROJECTS=[], PEOPLE=[], AB=[], SD=[], GIS=[], HIST=[], INV=[];
@@ -2539,9 +2572,11 @@ function heroPanel(){
 }
 
 function bars(title,groups,colFor,drill){
+  if(!groups.length)return '';            /* nothing to show, so show nothing */
   const max=Math.max(1,...groups.map(g=>g.total));
-  if(!groups.length)return `<div class="panel"><h3>${title}</h3>
-    <div class="empty" style="padding:20px">Nothing yet.</div></div>`;
+  /* long lists are cut to the biggest few, with a line saying what is left */
+  const CAP=7, rest=groups.length>CAP?groups.slice(CAP):[];
+  if(rest.length)groups=groups.slice(0,CAP);
   const at=(g,state)=>drill
     ? ` data-drill="${esc(drill.tab)}|${esc(drill.field)}|${esc(String(g.raw))}|${state}|${esc(g.k)}"`
     : '';
@@ -2553,6 +2588,8 @@ function bars(title,groups,colFor,drill){
         <i style="flex:${g.total-g.done};background:${colFor||'var(--hot)'}"${at(g,'open')}
            title="${g.total-g.done} outstanding"></i></div>
       <div class="bnum"${at(g,'all')}><b>${g.done}</b>/${g.total}</div></div>`).join('')}
+    ${rest.length?`<div class="bmore">and ${rest.length} more · ${
+        rest.reduce((t,g)=>t+g.done,0)}/${rest.reduce((t,g)=>t+g.total,0)}</div>`:''}
     <div class="legend"><span><i style="background:var(--good)"></i>done</span>
       <span><i style="background:${colFor||'var(--hot)'}"></i>outstanding</span>
       <span style="margin-left:auto;text-transform:none;letter-spacing:0">done / total</span>
