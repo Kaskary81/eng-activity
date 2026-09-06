@@ -549,7 +549,7 @@ body.windowed #statusline{display:none!important}   /* the taskbar carries it in
 <script>
 const SB_URL='https://ivmmnsjiekhjxkhllncb.supabase.co';
 const SB_KEY='sb_publishable_RTHsaxZXVmRBQziLbFJX8g_PAaZzIbF';
-const BUILD='ENG 2026-08-31 · e22';
+const BUILD='ENG 2026-09-06 · e23';
 
 let SESSION=null, ME=null;
 let PROJECTS=[], PEOPLE=[], AB=[], SD=[], GIS=[], HIST=[], INV=[];
@@ -669,6 +669,8 @@ const COLS={
     {k:'revision',    t:'Rev',       w:60},
     {k:'status',      t:'Status',   w:120,pill:1},
     {k:'category',    t:'Category', w:150},
+    {k:'issue_status',t:'Issue',      w:70},
+    {k:'action_by',   t:'With',       w:120},
     {k:'zone',        t:'Zone',     w:90},
     {k:'start_node',  t:'From',     w:100,cls:'mono'},
     {k:'end_node',    t:'To',       w:100,cls:'mono'},
@@ -680,6 +682,7 @@ const COLS={
     {k:'project_id',  t:'Project',  w:150,calc:r=>projName(r.project_id)}
   ],
   shop:[
+    {k:'doc_no',      t:'Document no.', w:230,cls:'mono'},
     {k:'submittal_no', t:'Submittal',  w:170,cls:'mono'},
     {k:'description',  t:'Description',w:300,wrap:1},
     {k:'discipline',   t:'Discipline', w:140},
@@ -777,6 +780,7 @@ const TABLE={asbuilts:'eng_asbuilts',shop:'eng_shopdrawings',gis:'eng_gis',
 const REVIEW=['Approved','Approved As Noted','Under Review','Revise & Resubmit',
               'Rejected','Pending NWC','Not Submitted','Withdrawn','For Information'];
 const EDIT={
+  _doc:{doc_no:'text',issue_status:'text',action_by:'text'},
   asbuilts:[['submittal_no','Submittal','text'],['description','Drawing','area'],
     ['discipline','Discipline','text'],['revision','Rev','num'],
     ['status','Status','sel',['Submitted','Notsubmitted']],
