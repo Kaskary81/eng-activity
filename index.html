@@ -260,19 +260,7 @@ table.daily tr.td-today td{background:var(--chip)}
 
 /* print */
 #printroot{display:none}
-@media print{
-  body{background:#fff!important;color:#000!important;overflow:visible!important}
-  #app,#toast,.sheet,#msg{display:none!important}
-  #printroot{display:block!important;padding:0}
-  @page{size:A4 landscape;margin:10mm 8mm}
-  .rhead h1{font-size:14pt;margin:0 0 3pt;color:#000}
-  .rsub{font-size:8.5pt;color:#444;margin-bottom:8pt}
-  table.rtbl{width:100%;border-collapse:collapse;font-size:7.4pt;table-layout:fixed}
-  table.rtbl th{background:#eee;text-align:left;padding:3pt;border:.5pt solid #999;color:#000}
-  table.rtbl td{padding:2.5pt 3pt;border:.5pt solid #bbb;word-wrap:break-word;
-    overflow-wrap:anywhere;color:#000}
-  table.rtbl tr{page-break-inside:avoid}
-}
+
 
 .hist{margin:16px 0 4px;border-top:1px solid var(--line);padding-top:14px}
 .hist>label{display:block;font-size:10px;font-weight:700;letter-spacing:.1em;
@@ -404,24 +392,7 @@ table.g tbody tr:nth-child(even) td.frz{background:var(--card2)}
 table.g th.frzlast,table.g td.frzlast{border-right:2px solid var(--accent)}
 
 /* the printed report, matching the LOD */
-@media print{
-  @page{size:A4 landscape;margin:10mm 8mm}
-  #printroot .rhead{display:flex;align-items:flex-end;justify-content:space-between;
-    border-bottom:2pt solid #12304f;padding-bottom:4pt;margin-bottom:6pt}
-  #printroot .rhead h1{font-size:12.5pt;font-weight:700;color:#12304f;letter-spacing:-.2pt;margin:0}
-  #printroot .rsub{font-size:7.6pt;color:#555;margin-top:1pt}
-  #printroot .rd{text-align:right;font-size:7.6pt;color:#555;line-height:1.4;white-space:nowrap}
-  #printroot .rd span{font-weight:700;color:#12304f}
-  #printroot table.rtbl{table-layout:fixed;width:100%;font-size:7.4pt;border-collapse:collapse}
-  #printroot .rtbl th,#printroot .rtbl td{border:.4pt solid #c3ced9;padding:2.5pt 3pt;
-    word-wrap:break-word;overflow-wrap:anywhere;text-align:left;vertical-align:top}
-  #printroot .rtbl th{background:#eef2f6;color:#12304f;font-size:6.6pt;text-transform:uppercase;
-    letter-spacing:.3pt;-webkit-print-color-adjust:exact;print-color-adjust:exact}
-  #printroot .rtbl tbody tr:nth-child(even) td{background:#f7f9fb;
-    -webkit-print-color-adjust:exact;print-color-adjust:exact}
-  #printroot .rtbl thead{display:table-header-group}
-  #printroot .rtbl tr{break-inside:avoid}
-}
+
 
 /* the card set, as in the LOD tracker */
 .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:14px}
@@ -533,6 +504,32 @@ table.g th.dropR{box-shadow:inset -3px 0 0 var(--accent)}
 .frrow .frc{color:var(--ink3);min-width:90px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .frrow .frold{color:var(--ink2);text-decoration:line-through}
 .frrow .frnew{color:var(--good);font-weight:600}
+
+@media print{
+  @page{size:A4 landscape;margin:9mm 8mm}
+  /* nothing on screen belongs on paper except the report itself */
+  body>*{display:none!important}
+  body #printroot{display:block!important}
+  html,body{background:#fff!important;color:#000!important;height:auto!important;
+    overflow:visible!important}
+  #printroot,#printroot *{color:#000!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  #printroot{font:8pt/1.3 system-ui,-apple-system,"Segoe UI",sans-serif}
+  #printroot .rhead{display:flex;align-items:flex-end;justify-content:space-between;
+    border-bottom:1.6pt solid #000;padding-bottom:4pt;margin-bottom:7pt}
+  #printroot .rhead h1{font-size:13pt;font-weight:700;margin:0;letter-spacing:-.2pt}
+  #printroot .rsub{font-size:7.6pt;margin-top:2pt}
+  #printroot .rd{text-align:right;font-size:7.6pt;line-height:1.35;white-space:nowrap}
+  #printroot .rd span{font-weight:700}
+  #printroot table.rtbl{table-layout:fixed;width:100%;border-collapse:collapse;font-size:7pt}
+  #printroot .rtbl th,#printroot .rtbl td{border:.4pt solid #999;padding:2.2pt 3pt;
+    text-align:left;vertical-align:top;word-wrap:break-word;overflow-wrap:anywhere}
+  #printroot .rtbl th{background:#e9e9e9!important;font-size:6.4pt;font-weight:700;
+    text-transform:uppercase;letter-spacing:.3pt}
+  #printroot .rtbl tbody tr:nth-child(even) td{background:#f6f6f6!important}
+  #printroot .rtbl thead{display:table-header-group}
+  #printroot .rtbl tr{page-break-inside:avoid}
+  #printroot .rtbl td.n{text-align:center}
+}
 </style>
 <script>
 (()=>{ let t=null; try{ t=localStorage.getItem('eng_theme'); }catch(e){}
@@ -587,7 +584,7 @@ table.g th.dropR{box-shadow:inset -3px 0 0 var(--accent)}
 <script>
 const SB_URL='https://ivmmnsjiekhjxkhllncb.supabase.co';
 const SB_KEY='sb_publishable_RTHsaxZXVmRBQziLbFJX8g_PAaZzIbF';
-const BUILD='ENG 2026-09-06 · e29';
+const BUILD='ENG 2026-09-06 · e30';
 
 let SESSION=null, ME=null;
 let PROJECTS=[], PEOPLE=[], AB=[], SD=[], GIS=[], HIST=[], INV=[];
@@ -1011,15 +1008,34 @@ function exportPDF(){
   let root=document.getElementById('printroot');
   if(!root){root=document.createElement('div');root.id='printroot';document.body.appendChild(root);}
   const label=(TABS.find(t=>t.k===TAB)||{}).t||'';
+  /* a column every row leaves blank wastes a strip of the page, so it is left
+     out of the printed report */
+  const used=cols.filter(c=>rows.some(r=>{
+    const v=c.calc?c.calc(r):r[c.k];
+    return v!==null&&v!==undefined&&String(v).trim()!=='';
+  }));
+  const shown=used.length?used:cols;
+  /* the widths: the description takes what is left, the short ones stay short */
+  const WIDE={description:26,doc_no:15,submittal_no:11,zone:8,discipline:8,review_status:9,
+              planned_date:7,submitted_date:7,received_date:7,last_revision:4,
+              owner_id:8,project_id:10,cycles:4};
+  const weights=shown.map(c=>WIDE[c.k]||9);
+  const total=weights.reduce((a,b)=>a+b,0);
   const when=new Date().toLocaleString('en-GB',{day:'2-digit',month:'short',year:'numeric',
     hour:'2-digit',minute:'2-digit'});
+  const dropped=cols.length-shown.length;
   root.innerHTML=`<div class="rhead">
-      <div><h1>Engineering Activity — ${esc(label)}</h1>
-        <div class="rsub">${esc(PROJ?projName(PROJ):'All projects')} · ${rows.length} records${
-          ME?' · '+esc(ME.name):''}</div></div>
-      <div class="rd"><span>AWPT Engineering</span><br>printed ${esc(when)}</div></div>
-    <table class="rtbl"><thead><tr><th>#</th>${cols.map(c=>`<th>${esc(c.t)}</th>`).join('')}</tr></thead>
-    <tbody>${rows.map((r,i)=>`<tr><td>${i+1}</td>${cols.map(c=>{
+      <div><h1>${esc(label)}${PROJ?' — '+esc(projName(PROJ)):''}</h1>
+        <div class="rsub">${rows.length} record${rows.length===1?'':'s'}${
+          PROJ?'':' · all projects'}${anyFilter&&anyFilter()?' · filtered':''}${
+          dropped?' · '+dropped+' empty column'+(dropped>1?'s':'')+' left out':''}</div></div>
+      <div class="rd"><span>AWPT Engineering</span><br>${esc(when)}${
+        ME?'<br>'+esc(ME.name):''}</div></div>
+    <table class="rtbl">
+      <colgroup><col style="width:3%">${shown.map((c,i)=>
+        `<col style="width:${(weights[i]/total*97).toFixed(1)}%">`).join('')}</colgroup>
+      <thead><tr><th>#</th>${shown.map(c=>`<th>${esc(c.t)}</th>`).join('')}</tr></thead>
+    <tbody>${rows.map((r,i)=>`<tr><td class="n">${i+1}</td>${shown.map(c=>{
       const v=c.calc?c.calc(r):r[c.k];
       return `<td>${esc(v==null?'':String(v))}</td>`;}).join('')}</tr>`).join('')}
     </tbody></table>`;
