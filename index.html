@@ -957,7 +957,7 @@ body.breaking,body.breaking *{user-select:none!important;-webkit-user-select:non
 <script>
 const SB_URL='https://ivmmnsjiekhjxkhllncb.supabase.co';
 const SB_KEY='sb_publishable_RTHsaxZXVmRBQziLbFJX8g_PAaZzIbF';
-const BUILD='ENG 2026-09-06 · e69';
+const BUILD='ENG 2026-09-06 · e70';
 
 let SESSION=null, ME=null;
 let PROJECTS=[], PEOPLE=[], AB=[], SD=[], GIS=[], HIST=[], INV=[];
@@ -3027,9 +3027,10 @@ function shatter(el,then){
     const mx=((p1[0]+p2[0])/2-cx), my=((p1[1]+p2[1])/2-cy);
     const len=Math.hypot(mx,my)||1;
     pieces.push({el:d, x:0, y:0,
-      vx:(mx/len)*(0.9+Math.random()*1.0),
-      vy:(my/len)*0.7-(1.6+Math.random()*1.1),
-      rot:0, vr:(Math.random()-0.5)*6,
+      /* thrown hard, as it was — the walls below keep it on screen */
+      vx:(mx/len)*(1.6+Math.random()*1.9),
+      vy:(my/len)*1.1-(2.6+Math.random()*1.6),
+      rot:0, vr:(Math.random()-0.5)*9,
       /* where this piece's own lowest corner sits, so it lands on its edge */
       foot:r.top+r.height*(Math.max(cy,p1[1],p2[1])/100),
       cxpx:r.left+r.width*((cx+p1[0]+p2[0])/300),
@@ -3052,9 +3053,9 @@ function shatter(el,then){
         /* the screen has sides. A piece that reaches one bounces off it
            instead of disappearing, which is what "flew away" looked like. */
         const M=18;
-        if(xNow<M){ p.x+=(M-xNow); p.vx=Math.abs(p.vx)*0.5; p.vr*=-0.6; xNow=M; }
+        if(xNow<M){ p.x+=(M-xNow); p.vx=Math.abs(p.vx)*0.62; p.vr*=-0.7; xNow=M; }
         else if(xNow>innerWidth-M){ p.x-=(xNow-(innerWidth-M));
-          p.vx=-Math.abs(p.vx)*0.5; p.vr*=-0.6; xNow=innerWidth-M; }
+          p.vx=-Math.abs(p.vx)*0.62; p.vr*=-0.7; xNow=innerWidth-M; }
         /* and a ceiling, so an upward throw cannot leave the top */
         if(footNow<-r.height*0.4){ p.y+=(-r.height*0.4-footNow); p.vy=Math.abs(p.vy)*0.4;
           footNow=-r.height*0.4; }
