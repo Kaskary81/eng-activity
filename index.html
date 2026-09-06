@@ -692,6 +692,35 @@ table.g tbody tr:hover .openb{color:var(--ink2)}
   .projrow{gap:8px}
   .proj{min-width:150px;padding:9px 12px}
 }
+
+/* the sheet a long press raises */
+.msheet{position:fixed;inset:0;z-index:9000;background:rgba(0,0,0,.5);display:flex;
+  align-items:flex-end;opacity:0;transition:opacity .18s var(--ease)}
+.msheet.on{opacity:1}
+.msheetcard{width:100%;background:var(--surface);border-radius:18px 18px 0 0;
+  padding:10px 10px calc(14px + var(--safe-b));transform:translateY(14px);
+  transition:transform .22s var(--ease);box-shadow:var(--shadow)}
+.msheet.on .msheetcard{transform:none}
+.msheettitle{font-size:12px;color:var(--ink3);padding:8px 12px 10px;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;border-bottom:1px solid var(--line)}
+.msheetlist{display:flex;flex-direction:column;gap:4px;padding-top:6px}
+.msheetbtn{background:none;border:none;color:var(--ink);text-align:left;font:inherit;
+  font-size:15px;padding:13px 14px;border-radius:11px;cursor:pointer}
+.msheetbtn:active{background:var(--chip)}
+.msheetbtn.danger{color:var(--critical)}
+.msheetbtn.cancel{color:var(--ink3);margin-top:4px;border-top:1px solid var(--line);border-radius:0}
+/* a tighter phone header */
+@media (max-width:760px){
+  #tabs{overflow-x:auto;flex-wrap:nowrap;-webkit-overflow-scrolling:touch}
+  #tabs::-webkit-scrollbar{display:none}
+  .tab{white-space:nowrap;padding:8px 10px;font-size:12.5px;flex:none}
+  .tab .n{font-size:10.5px;padding:1px 5px}
+  .projrow{overflow-x:auto;flex-wrap:nowrap}
+  .proj{min-width:132px;padding:8px 11px}
+  .proj b{font-size:12.5px}
+  header{padding:8px 12px 0}
+  #topbar{padding:7px 12px}
+}
 </style>
 <script>
 (()=>{ let t=null; try{ t=localStorage.getItem('eng_theme'); }catch(e){}
@@ -746,7 +775,7 @@ table.g tbody tr:hover .openb{color:var(--ink2)}
 <script>
 const SB_URL='https://ivmmnsjiekhjxkhllncb.supabase.co';
 const SB_KEY='sb_publishable_RTHsaxZXVmRBQziLbFJX8g_PAaZzIbF';
-const BUILD='ENG 2026-09-06 · e49';
+const BUILD='ENG 2026-09-06 · e50';
 
 let SESSION=null, ME=null;
 let PROJECTS=[], PEOPLE=[], AB=[], SD=[], GIS=[], HIST=[], INV=[];
@@ -1589,9 +1618,12 @@ function paintRail(){
   $('rail').querySelectorAll('[data-p]').forEach(b=>b.onclick=()=>{
     PROJ=b.dataset.p?+b.dataset.p:null; paint(); });
 }
+const TABSHORT={asbuilts:'As-Builts',shop:'Shop',gis:'GIS',invoice:'Invoices'};
 function paintTabs(){
+  const short=isPhone();
   $('tabs').innerHTML=TABS.map(t=>
-    `<button class="tab ${TAB===t.k?'on':''}" data-t="${t.k}">${t.t}${
+    `<button class="tab ${TAB===t.k?'on':''}" data-t="${t.k}">${
+      esc(short?(TABSHORT[t.k]||t.t):t.t)}${
       t.k!=='overview'?`<span class="n">${t.n()}</span>`:''}</button>`).join('');
   $('tabs').querySelectorAll('[data-t]').forEach(b=>b.onclick=()=>{
     TAB=b.dataset.t; F=''; Q=''; DF={field:'',from:'',to:''}; DRILL=null;
@@ -2652,6 +2684,94 @@ document.addEventListener('paste',e=>{
    number, what it is, where it stands, and the dates that matter.
    ============================================================ */
 const isPhone=()=>window.matchMedia('(max-width:760px)').matches;
+
+/* Hold a card for the things you would otherwise open the record to do. */
+let _lp=null;
+function wireCardHold(){
+  document.querySelectorAll('.mcard[data-open]').forEach(el=>{
+    const id=+el.dataset.open;
+    const start=e=>{
+      clearTimeout(_lp&&_lp.t);
+      const x=e.touches?e.touches[0].clientX:e.clientX, y=e.touches?e.touches[0].clientY:e.clientY;
+      _lp={x,y,fired:false,t:setTimeout(()=>{
+        _lp.fired=true;
+        if(navigator.vibrate)navigator.vibrate(12);
+        cardMenu(id);
+      },480)};
+    };
+    const move=e=>{
+      if(!_lp)return;
+      const x=e.touches?e.touches[0].clientX:e.clientX, y=e.touches?e.touches[0].clientY:e.clientY;
+      if(Math.abs(x-_lp.x)+Math.abs(y-_lp.y)>10){ clearTimeout(_lp.t); _lp=null; }
+    };
+    const end=()=>{ if(_lp)clearTimeout(_lp.t); };
+    el.addEventListener('touchstart',start,{passive:true});
+    el.addEventListener('touchmove',move,{passive:true});
+    el.addEventListener('touchend',end);
+    el.addEventListener('pointerdown',e=>{ if(e.pointerType!=='touch')start(e); });
+    el.addEventListener('pointerup',end);
+    el.addEventListener('contextmenu',e=>{ e.preventDefault(); cardMenu(id); });
+    el.addEventListener('click',e=>{ if(_lp&&_lp.fired){ e.preventDefault(); e.stopPropagation();
+      _lp=null; return; } openSheet(id); },true);
+  });
+}
+function cardMenu(id){
+  const row=(rowsOf(TAB)||[]).find(r=>r.id===id); if(!row)return;
+  const title=row.description||row.doc_no||row.submittal_no||('#'+id);
+  const f=(EDIT[TAB]||[]).find(x=>x[2]==='sel');
+  const acts=[['Open the record',()=>openSheet(id)]];
+  if(f)acts.push([(f[1]||'Status')+'…',()=>{
+    const list=liveOptions(f[0],f[3],row);
+    const maaden=projectClient(row.project_id)==='Maaden';
+    const show=o=>(maaden&&MAADEN_GRADE[o])?maadenLabel(o):o;
+    msgBox(f[1]||'Status',
+      `<select class="f" id="cmst">${list.map(o=>
+        `<option value="${esc(o)}"${row[f[0]]===o?' selected':''}>${esc(show(o))}</option>`).join('')}</select>`,
+      [['Cancel',null,''],['Set it',async()=>{
+        const v=document.getElementById('cmst').value;
+        await applyEdits([{row,col:{k:f[0],t:f[1]},f,val:v}],'Set');
+      },'primary']]);
+  }]);
+  acts.push(['Planned date…',()=>{
+    msgBox('Planned date',
+      `<input class="f" id="cmdate" type="date" value="${esc(row.planned_date||'')}">`,
+      [['Cancel',null,''],['Set it',async()=>{
+        const v=document.getElementById('cmdate').value;
+        await applyEdits([{row,col:{k:'planned_date',t:'Planned'},
+          f:['planned_date','Planned','date'],val:v}],'Planned');
+      },'primary']]);
+  }]);
+  acts.push(['Copy the document number',async()=>{
+    const t=row.doc_no||row.submittal_no||'';
+    if(!t)return toast('This record has no number');
+    try{ await navigator.clipboard.writeText(t); toast('Copied'); }catch(e){ toast('Could not copy'); }
+  }]);
+  if(canEdit())acts.push(['Delete',()=>{
+    msgBox('Delete this record',
+      `<div class="hint">${esc(title)}<br><br>This also removes its submission history.</div>`,
+      [['Cancel',null,''],['Delete',async()=>{
+        try{
+          await api('eng_history?kind=eq.'+(TAB==='shop'?'shop':TAB)+'&record_id=eq.'+id,{method:'DELETE'});
+          await api(TABLE[TAB]+'?id=eq.'+id,{method:'DELETE'});
+          toast('Deleted'); await loadAll(); paint();
+        }catch(e){ toast(e.message); }
+      },'danger']]);
+  }]);
+
+  const wrap=document.createElement('div');
+  wrap.className='msheet';
+  wrap.innerHTML=`<div class="msheetcard"><div class="msheettitle">${esc(String(title).slice(0,72))}</div>
+    <div class="msheetlist">${acts.map((a,i)=>
+      `<button class="msheetbtn${a[0]==='Delete'?' danger':''}" data-a="${i}">${esc(a[0])}</button>`).join('')}
+      <button class="msheetbtn cancel" data-a="-1">Cancel</button></div></div>`;
+  document.body.appendChild(wrap);
+  const close=()=>{ wrap.classList.remove('on'); setTimeout(()=>wrap.remove(),160); };
+  wrap.addEventListener('click',e=>{ if(e.target===wrap)close(); });
+  wrap.querySelectorAll('[data-a]').forEach(b=>b.onclick=()=>{
+    const i=+b.dataset.a; if(i>=0)acts[i][1](); close(); });
+  requestAnimationFrame(()=>wrap.classList.add('on'));
+}
+
 function cardsHTML(rows,cols){
   if(!rows.length)return '<div class="empty"><b>Nothing matches</b>Try a different search or filter.</div>';
   const F=k=>cols.find(c=>c.k===k);
@@ -2697,8 +2817,7 @@ function paintTable(){
   GRIDROWS=rows; GRIDCOLS=vcols;
   if(isPhone()&&!PAINT_TARGET){
     $wrap().innerHTML=cardsHTML(rows,vcols);
-    $wrap().querySelectorAll('[data-open]').forEach(el=>
-      el.onclick=()=>openSheet(+el.dataset.open));
+    wireCardHold();
     const c=$('count'); if(c)c.textContent=rows.length+' of '+rowsOf(TAB).length;
     return;
   }
