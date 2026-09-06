@@ -526,6 +526,13 @@ table.g th[data-k]{cursor:grab}
 table.g th.dragging{opacity:.5}
 table.g th.dropL{box-shadow:inset 3px 0 0 var(--accent)}
 table.g th.dropR{box-shadow:inset -3px 0 0 var(--accent)}
+
+/* the preview inside find and replace */
+.frrow{display:flex;align-items:center;gap:8px;padding:3px 4px;border-bottom:1px solid var(--line);
+  font-size:12px}
+.frrow .frc{color:var(--ink3);min-width:90px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.frrow .frold{color:var(--ink2);text-decoration:line-through}
+.frrow .frnew{color:var(--good);font-weight:600}
 </style>
 <script>
 (()=>{ let t=null; try{ t=localStorage.getItem('eng_theme'); }catch(e){}
@@ -580,7 +587,7 @@ table.g th.dropR{box-shadow:inset -3px 0 0 var(--accent)}
 <script>
 const SB_URL='https://ivmmnsjiekhjxkhllncb.supabase.co';
 const SB_KEY='sb_publishable_RTHsaxZXVmRBQziLbFJX8g_PAaZzIbF';
-const BUILD='ENG 2026-09-06 · e28';
+const BUILD='ENG 2026-09-06 · e29';
 
 let SESSION=null, ME=null;
 let PROJECTS=[], PEOPLE=[], AB=[], SD=[], GIS=[], HIST=[], INV=[];
@@ -1354,6 +1361,7 @@ function paintTools(){
      <button class="btn${WRAPCELLS?' on':''}" id="wrapb"
         title="Let long text wrap onto several lines">Wrap text</button>
      <button class="btn" id="filld" title="Copy the top cell down the selection — Ctrl+D">Fill down</button>
+     <button class="btn" id="frb" title="Find and replace across this register — Ctrl+H">Find &amp; replace</button>
      <button class="btn" id="pdf">Print</button>
      ${anyFilter()?`<button class="btn" id="clrf" title="${esc(filterSummary())}"
         style="border-color:var(--accent);color:var(--accent)">✕ Clear filters</button>`:''}
@@ -1365,6 +1373,7 @@ function paintTools(){
     paint(); };
   if($('filld'))$('filld').onclick=()=>fillDown();
   if($('alerts'))$('alerts').onclick=()=>alertsBox();
+  if($('frb'))$('frb').onclick=()=>findReplaceBox();
   $('tools').querySelectorAll('[data-f]').forEach(b=>b.onclick=()=>{F=b.dataset.f;paint();});
   if($('cleardrill'))$('cleardrill').onclick=clearDrill;
   if($('newrec'))$('newrec').onclick=newRecord;
@@ -2153,6 +2162,7 @@ function gridKey(e){
   else if(k==='Delete'||k==='Backspace'){e.preventDefault();clearSel();}
   else if((e.ctrlKey||e.metaKey)&&k.toLowerCase()==='c'){e.preventDefault();copySel();}
   else if((e.ctrlKey||e.metaKey)&&k.toLowerCase()==='d'){e.preventDefault();fillDown();}
+  else if((e.ctrlKey||e.metaKey)&&k.toLowerCase()==='h'){e.preventDefault();findReplaceBox();}
   else if((e.ctrlKey||e.metaKey)&&k.toLowerCase()==='a'){e.preventDefault();
     SEL={r1:0,c1:0,r2:maxR,c2:maxC};CUR={r:0,c:0};paintSel();}
   else if(k.length===1&&!e.ctrlKey&&!e.metaKey&&!e.altKey){
@@ -2470,6 +2480,100 @@ async function pickAction(a){
         PICKED.clear(); await loadAll(); paint();
       },'danger']]);
   }
+}
+
+
+/* ============================================================
+   Find and replace, across the register you are in. It only touches
+   columns that can be written to, only the rows currently shown, and
+   it shows you what it will change before it changes anything.
+   ============================================================ */
+let FRSTATE={find:'',repl:'',col:'',caseOn:false,whole:false,selOnly:false};
+function findReplaceBox(){
+  const cols=GRIDCOLS.filter(c=>colEditable(c));
+  if(!cols.length)return toast('Nothing in this register can be edited');
+  const b=selBox();
+  msgBox('Find and replace',
+    `<label class="fl">Find</label>
+     <input class="f" id="frf" value="${esc(FRSTATE.find)}" placeholder="text to look for">
+     <label class="fl" style="margin-top:8px">Replace with</label>
+     <input class="f" id="frr" value="${esc(FRSTATE.repl)}" placeholder="leave empty to clear it">
+     <label class="fl" style="margin-top:8px">Where</label>
+     <select class="f" id="frc">
+       <option value="">Every column that can be edited</option>
+       ${cols.map(c=>`<option value="${esc(c.k)}"${FRSTATE.col===c.k?' selected':''}>${esc(c.t)}</option>`).join('')}
+     </select>
+     <div style="display:flex;flex-wrap:wrap;gap:14px;margin-top:10px">
+       <label style="display:flex;align-items:center;gap:6px">
+         <input type="checkbox" id="frcase"${FRSTATE.caseOn?' checked':''}><span>Match case</span></label>
+       <label style="display:flex;align-items:center;gap:6px">
+         <input type="checkbox" id="frwhole"${FRSTATE.whole?' checked':''}><span>Whole cell only</span></label>
+       ${b?`<label style="display:flex;align-items:center;gap:6px">
+         <input type="checkbox" id="frsel"${FRSTATE.selOnly?' checked':''}><span>Only the selected cells</span></label>`:''}
+     </div>
+     <div class="hint" id="frcount" style="margin-top:10px">Type something to find.</div>
+     <div id="frlist" style="max-height:190px;overflow:auto;margin-top:6px"></div>`,
+    [['Cancel',null,''],['Replace them',async()=>{
+       const jobs=frMatches().jobs;
+       if(!jobs.length)return toast('Nothing matched');
+       await applyEdits(jobs,'Replaced');
+     },'primary']]);
+  const m=document.getElementById('msg');
+  const read=()=>{
+    FRSTATE={find:m.querySelector('#frf').value, repl:m.querySelector('#frr').value,
+      col:m.querySelector('#frc').value, caseOn:m.querySelector('#frcase').checked,
+      whole:m.querySelector('#frwhole').checked,
+      selOnly:!!(m.querySelector('#frsel')&&m.querySelector('#frsel').checked)};
+  };
+  const preview=()=>{
+    read();
+    const {jobs,rows}=frMatches();
+    m.querySelector('#frcount').innerHTML = !FRSTATE.find ? 'Type something to find.'
+      : jobs.length ? `<b>${jobs.length}</b> cell${jobs.length>1?'s':''} in <b>${rows}</b> record${rows>1?'s':''} will change.`
+      : 'Nothing matches.';
+    m.querySelector('#frlist').innerHTML = jobs.slice(0,12).map(j=>
+      `<div class="frrow"><span class="frc">${esc(j.col.t)}</span>
+        <span class="frold">${esc(j.was)}</span> → <span class="frnew">${esc(j.val)}</span></div>`).join('')
+      + (jobs.length>12?`<div class="hint">…and ${jobs.length-12} more</div>`:'');
+  };
+  ['#frf','#frr','#frc','#frcase','#frwhole','#frsel'].forEach(sel=>{
+    const el=m.querySelector(sel); if(el){ el.oninput=preview; el.onchange=preview; }
+  });
+  m.querySelector('#frf').focus();
+  preview();
+}
+/* every change find-and-replace would make, without making any of them */
+function frMatches(){
+  const out=[]; const seen=new Set();
+  if(!FRSTATE.find)return {jobs:out,rows:0};
+  const b=FRSTATE.selOnly?selBox():null;
+  const cols=GRIDCOLS.filter(c=>colEditable(c) && (!FRSTATE.col||c.k===FRSTATE.col));
+  const needle=FRSTATE.caseOn?FRSTATE.find:FRSTATE.find.toLowerCase();
+  GRIDROWS.forEach((row,ri)=>{
+    if(b&&(ri<b.r1||ri>b.r2))return;
+    cols.forEach(col=>{
+      const ci=GRIDCOLS.indexOf(col);
+      if(b&&(ci<b.c1||ci>b.c2))return;
+      const was=cellValue(row,col);
+      const hay=FRSTATE.caseOn?was:was.toLowerCase();
+      let val=null;
+      if(FRSTATE.whole){ if(hay===needle)val=FRSTATE.repl; }
+      else if(needle && hay.includes(needle)){
+        /* replace every occurrence, keeping the original casing elsewhere */
+        val=''; let i=0;
+        while(true){
+          const at=hay.indexOf(needle,i);
+          if(at<0){ val+=was.slice(i); break; }
+          val+=was.slice(i,at)+FRSTATE.repl;
+          i=at+needle.length;
+        }
+      }
+      if(val===null||val===was)return;
+      out.push({row,col,f:colEditable(col),val,was});
+      seen.add(row.id);
+    });
+  });
+  return {jobs:out,rows:seen.size};
 }
 
 function wireCells(){
