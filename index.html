@@ -717,7 +717,7 @@ table.g tbody tr:hover .openb{color:var(--ink2)}
 <script>
 const SB_URL='https://ivmmnsjiekhjxkhllncb.supabase.co';
 const SB_KEY='sb_publishable_RTHsaxZXVmRBQziLbFJX8g_PAaZzIbF';
-const BUILD='ENG 2026-09-06 · e41';
+const BUILD='ENG 2026-09-06 · e42';
 
 let SESSION=null, ME=null;
 let PROJECTS=[], PEOPLE=[], AB=[], SD=[], GIS=[], HIST=[], INV=[];
@@ -991,8 +991,23 @@ const TABLE={asbuilts:'eng_asbuilts',shop:'eng_shopdrawings',gis:'eng_gis',
   invoice:'eng_invoice_sections'};
 /* Ma'aden's own stamps are the register's vocabulary. Their scheme has no B —
    what an AWPT workbook calls Code B is the Client's C. */
-const REVIEW=['Code A','Code B','Rejected','Replied','Deemed',
-              'Under Client review','On hold','Not Submitted','Withdrawn'];
+/* Ma'aden stamp A/C/R/I; NWC use their own words. The register offers the
+   vocabulary of whichever client the project answers to, and on "all projects"
+   it offers both so nothing is unreachable. */
+const REVIEW_MAADEN=['Code A','Code B','Rejected','Replied','Deemed',
+                     'Under Client review','On hold','Not Submitted','Withdrawn'];
+const REVIEW_NWC=['Approved','Approved As Noted','Under Review','Revise & Resubmit',
+                  'Rejected','Pending NWC','Not Submitted','Withdrawn','For Information'];
+const clientOf=pid=>{
+  const p=(PROJECTS||[]).find(x=>x.id===(pid??PROJ));
+  return (p&&p.client)||'NWC';
+};
+const isMaaden=()=>PROJ ? clientOf(PROJ)==='Maaden'
+                        : (PROJECTS||[]).some(p=>p.client==='Maaden');
+Object.defineProperty(window,'REVIEW',{get(){
+  if(PROJ)return clientOf(PROJ)==='Maaden'?REVIEW_MAADEN:REVIEW_NWC;
+  return [...new Set([...REVIEW_NWC,...REVIEW_MAADEN])];
+}});
 const EDIT={
   _doc:{doc_no:'text',issue_status:'text',action_by:'text'},
   asbuilts:[['submittal_no','Submittal','text'],['description','Drawing','area'],
@@ -2414,6 +2429,14 @@ function wireCombos(scope){
   });
 }
 
+
+/* the choices for a select field, worked out NOW rather than when the file
+   loaded — the review list depends on which client the project answers to */
+function liveOptions(key,fallback){
+  if(key==='review_status'||key==='status'&&TAB==='gis')return REVIEW;
+  return fallback||[];
+}
+
 function colChoices(key,tab){
   const t=tab||TAB;
   const rows=rowsOf(t)||[];
@@ -2451,7 +2474,9 @@ function beginCellEdit(r,c,seed){
   let el;
   if(kind==='sel'){
     el=document.createElement('select');
-    el.innerHTML=(f[3]||[]).map(o=>`<option${String(o)===cur?' selected':''}>${esc(o)}</option>`).join('');
+    const opts=liveOptions(col.k,f[3]);
+    el.innerHTML=opts.map(o=>`<option${String(o)===cur?' selected':''}>${esc(o)}</option>`).join('')+
+      ((cur&&!opts.includes(cur))?`<option selected>${esc(cur)}</option>`:'');
   }else if((kind==='text'||kind==='area')&&seed===undefined&&colChoices(col.k).length){
     /* a column whose values repeat gets a real dropdown, so every choice is
        visible — the browser's own suggestion list only shows what matches
@@ -2703,6 +2728,16 @@ function regSplit(tab){
              f:r=>!done(r)&&r.submitted_date});
     st.push({k:'none', t:'Not submitted', c:'var(--ink3)',  s:'no submission at all',
              f:r=>!done(r)&&!r.submitted_date});
+  } else if(tab==='shop' && !isMaaden()){
+    /* NWC's own words */
+    st.push({k:'ok',   t:'Approved',      c:'var(--good)',  s:'approved by the reviewer',
+             f:r=>GIS_OK(r.review_status)});
+    st.push({k:'rev',  t:'To revise',     c:'var(--serious)',s:'returned with comments',
+             f:r=>/revise|reject/i.test(r.review_status||'')});
+    st.push({k:'under',t:'Under review',  c:'var(--warn)',  s:'submitted, awaiting the reviewer',
+             f:r=>!GIS_OK(r.review_status)&&r.submitted_date});
+    st.push({k:'none', t:'Not submitted', c:'var(--ink3)',  s:'no submission at all',
+             f:r=>true});
   } else if(tab==='shop'){
     st.push({k:'a',    t:'A — accepted',  c:'#0f9d58',
              s:"Code A, Deemed accepted", f:r=>/^(Code A|Deemed|Approved)$/.test(r.review_status||'')});
