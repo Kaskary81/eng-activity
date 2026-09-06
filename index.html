@@ -717,7 +717,7 @@ table.g tbody tr:hover .openb{color:var(--ink2)}
 <script>
 const SB_URL='https://ivmmnsjiekhjxkhllncb.supabase.co';
 const SB_KEY='sb_publishable_RTHsaxZXVmRBQziLbFJX8g_PAaZzIbF';
-const BUILD='ENG 2026-09-06 · e39';
+const BUILD='ENG 2026-09-06 · e40';
 
 let SESSION=null, ME=null;
 let PROJECTS=[], PEOPLE=[], AB=[], SD=[], GIS=[], HIST=[], INV=[];
@@ -827,7 +827,17 @@ const MAADEN_GRADE={
   'Replied':           {g:'I', t:'For information',         d:'issued to the Client for information'},
   'Deemed':            {g:'A', t:'Deemed accepted',         d:'no reply within 10 working days'},
   'Under Client review':{g:'', t:'Under Client review',     d:'with Ma\'aden, awaiting their stamp'},
-  'On hold':           {g:'',  t:'On hold',                 d:'held pending a prerequisite'}
+  'On hold':           {g:'',  t:'On hold',                 d:'held pending a prerequisite'},
+  /* the words this app already uses, carrying the Client's own stamp, so a
+     register loaded from an AWPT workbook still reads in Ma'aden's terms */
+  'Approved':          {g:'A', t:'Accepted',                d:'accepted — Code A'},
+  'Approved As Noted': {g:'C', t:'Proceed with exceptions', d:'proceed with exceptions to the next submission and revision — Code B/C'},
+  'Revise & Resubmit': {g:'R', t:'Do not proceed',          d:'revise as noted and resubmit'},
+  'For Information':   {g:'I', t:'For information',         d:'issued for information'},
+  'Under Review':      {g:'',  t:'Under review',            d:'submitted, awaiting the reviewer'},
+  'Not Submitted':     {g:'',  t:'Not submitted',           d:'no submission yet'},
+  'Pending NWC':       {g:'',  t:'Pending NWC',             d:'waiting on NWC'},
+  'Withdrawn':         {g:'',  t:'Withdrawn',               d:'withdrawn'}
 };
 const MAADEN_CODES=['Code A','Code B','Rejected','Replied','Deemed',
                     'Under Client review','On hold'];
