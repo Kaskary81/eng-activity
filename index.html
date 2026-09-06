@@ -592,7 +592,7 @@ table.g tbody tr:hover .openb{color:var(--ink2)}
 <script>
 const SB_URL='https://ivmmnsjiekhjxkhllncb.supabase.co';
 const SB_KEY='sb_publishable_RTHsaxZXVmRBQziLbFJX8g_PAaZzIbF';
-const BUILD='ENG 2026-09-06 · e32';
+const BUILD='ENG 2026-09-06 · e33';
 
 let SESSION=null, ME=null;
 let PROJECTS=[], PEOPLE=[], AB=[], SD=[], GIS=[], HIST=[], INV=[];
@@ -898,7 +898,15 @@ function openSheet(id){
             `<option${String(v)===o?' selected':''}>${esc(o)}</option>`).join('')}</select>`
       : type==='date' ? `<input id="f-${k}" type="date" value="${esc(v)}"${dis}>`
       : type==='num'  ? `<input id="f-${k}" type="number" value="${esc(v)}"${dis}>`
-                      : `<input id="f-${k}" value="${esc(v)}"${dis}>`;
+      : (()=>{ const ch=colChoices(k);
+          if(!ch.length)return `<input id="f-${k}" value="${esc(v)}"${dis}>`;
+          const known=ch.includes(String(v));
+          return `<select id="f-${k}" data-combo="${k}"${dis}>
+            <option value=""${v===''?' selected':''}>— none —</option>
+            ${ch.map(o=>`<option${String(v)===o?' selected':''}>${esc(o)}</option>`).join('')}
+            ${(!known&&v!=='')?`<option selected>${esc(v)}</option>`:''}
+            <option value="__new">＋ something else…</option></select>`;
+        })();
       return `<div class="fld"><label>${esc(label)}</label>${input}</div>`;}).join('')}
       <div class="fld"><label>Project</label>
         <select id="f-project_id"${canEdit()?'':' disabled'}>
@@ -920,8 +928,8 @@ function openSheet(id){
       toast('Cycle removed'); }catch(err){ toast(err.message); }
   });
   if(!canEdit())return;
-  fields.concat([['project_id','','sel']]).forEach(([k])=>{
-    const el=document.getElementById('f-'+k); if(!el)return;
+  const _attach=(k,el)=>{
+    if(!el)return;
     /* the same growing list of choices as the grid */
     if(el.tagName==='INPUT'&&(el.type==='text'||!el.type)&&colChoices(k).length){
       el.setAttribute('list',datalistFor(k));
@@ -937,7 +945,11 @@ function openSheet(id){
         toast('Saved'); }
       catch(e){ row[k]=before; paintTable(); toast(e.message); }
     };
-  });
+  };
+  window._rewireField=(k,el)=>_attach(k,el);
+  fields.concat([['project_id','','sel']]).forEach(([k])=>
+    _attach(k,document.getElementById('f-'+k)));
+  wireCombos(document.getElementById('sheet'));
 }
 
 /* ---------- filter by a date range ---------- */
@@ -2134,6 +2146,26 @@ async function applyEdits(jobs,what){
    built from the values in that column across the whole register, commonest
    first, and you can still type something new — so it grows by itself instead
    of needing a list defined for every field. */
+
+/* "＋ something else…" turns the dropdown into a text box, so a new value can
+   be typed without losing the list for everyone else */
+function wireCombos(scope){
+  (scope||document).querySelectorAll('select[data-combo]').forEach(sel=>{
+    if(sel._combo)return; sel._combo=1;
+    sel.addEventListener('change',e=>{
+      if(sel.value!=='__new')return;
+      const k=sel.dataset.combo;
+      const inp=document.createElement('input');
+      inp.id=sel.id; inp.value=''; inp.placeholder='Type the new value';
+      sel.replaceWith(inp); inp.focus();
+      inp.onchange=()=>{ if(typeof sel.onchange==='function')sel.onchange.call(inp); };
+      /* the save handler is attached by id, so re-attach it to the new box */
+      if(typeof _rewireField==='function')_rewireField(k,inp);
+      e.stopImmediatePropagation();
+    });
+  });
+}
+
 function colChoices(key,tab){
   const t=tab||TAB;
   const rows=rowsOf(t)||[];
@@ -2145,12 +2177,12 @@ function colChoices(key,tab){
     if(!s)return;
     count.set(s,(count.get(s)||0)+1);
   });
-  /* a column only earns a list if its values actually REPEAT — a document
-     number is different on every row, so offering all 217 of them is noise */
+  /* A column earns a dropdown when it holds a manageable set of values —
+     discipline, zone, who has it. A document number is different on every
+     row, so 217 of them would be noise; the ceiling keeps those out. */
   const list=[...count.entries()]
     .sort((a,b)=>b[1]-a[1] || String(a[0]).localeCompare(String(b[0]),undefined,{numeric:true}));
-  const repeats=list.some(([,n])=>n>1);
-  if(!repeats || list.length>60)return [];
+  if(!list.length || list.length>40)return [];
   return list.map(([v])=>v);
 }
 function datalistFor(key,tab){
@@ -2172,16 +2204,34 @@ function beginCellEdit(r,c,seed){
   if(kind==='sel'){
     el=document.createElement('select');
     el.innerHTML=(f[3]||[]).map(o=>`<option${String(o)===cur?' selected':''}>${esc(o)}</option>`).join('');
+  }else if((kind==='text'||kind==='area')&&seed===undefined&&colChoices(col.k).length){
+    /* a column whose values repeat gets a real dropdown, so every choice is
+       visible — the browser's own suggestion list only shows what matches
+       the text already in the box, which looked empty */
+    const ch=colChoices(col.k), known=ch.includes(cur);
+    el=document.createElement('select');
+    el.innerHTML=`<option value=""${cur===''?' selected':''}>— none —</option>`+
+      ch.map(o=>`<option${o===cur?' selected':''}>${esc(o)}</option>`).join('')+
+      ((!known&&cur!=='')?`<option selected>${esc(cur)}</option>`:'')+
+      `<option value="__new">＋ something else…</option>`;
+    el.addEventListener('change',()=>{
+      if(el.value!=='__new')return;
+      const inp=document.createElement('input');
+      inp.type='text'; inp.className='cellin'; inp.value='';
+      inp.placeholder='Type the new value';
+      el.replaceWith(inp); inp.focus();
+      inp.addEventListener('blur',()=>finish(true));
+      inp.addEventListener('keydown',ev=>{
+        ev.stopPropagation();
+        if(ev.key==='Enter'){ev.preventDefault();finish(true);}
+        if(ev.key==='Escape'){ev.preventDefault();finish(false);}
+      });
+      el=inp;
+    });
   }else{
     el=document.createElement('input');
     el.type = kind==='date'?'date' : kind==='num'?'number' : 'text';
     el.value = seed!==undefined?seed:cur;
-    /* a plain text column offers what has been used before, and still takes
-       anything new */
-    if(kind==='text'||kind==='area'){
-      if(colChoices(col.k).length){ el.setAttribute('list',datalistFor(col.k));
-        el.setAttribute('autocomplete','off'); }
-    }
   }
   el.className='cellin';
   td.innerHTML=''; td.appendChild(el); el.focus();
