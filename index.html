@@ -746,7 +746,7 @@ table.g tbody tr:hover .openb{color:var(--ink2)}
 <script>
 const SB_URL='https://ivmmnsjiekhjxkhllncb.supabase.co';
 const SB_KEY='sb_publishable_RTHsaxZXVmRBQziLbFJX8g_PAaZzIbF';
-const BUILD='ENG 2026-09-06 · e48';
+const BUILD='ENG 2026-09-06 · e49';
 
 let SESSION=null, ME=null;
 let PROJECTS=[], PEOPLE=[], AB=[], SD=[], GIS=[], HIST=[], INV=[];
@@ -886,8 +886,11 @@ const SCOL={ 'Submitted':'var(--good)','Notsubmitted':'var(--hot)',
   'Code A':'#0f9d58','Deemed':'#4bb07a','Code B':'#6fc38a','Rejected':'#d64545',
   'Replied':'var(--sky)','Under Client review':'var(--warn)','On hold':'#7030a0',
   'RNC':'#6b7f92','RWC':'#7d8fa0','Awaiting reply':'var(--warn)','For Information':'var(--sky)' };
-const pill = s => { if(!s)return '';
-  const col=SCOL[s]||'var(--chip)', m=MAADEN_GRADE[s];
+const pill = (s,row) => { if(!s)return '';
+  /* the Client's letter only where the Client is Ma'aden */
+  const maaden = row ? projectClient(row.project_id)==='Maaden'
+                     : (PROJ!=null && projectClient(PROJ)==='Maaden');
+  const col=SCOL[s]||'var(--chip)', m=maaden?MAADEN_GRADE[s]:null;
   /* the badge already carries the letter, so the words beside it are just
      the meaning — "A  Accepted", not "A  A — Accepted" */
   const text=m?(m.g?m.t:m.t):s;
@@ -1115,7 +1118,8 @@ function openSheet(id){
       : type==='sel'  ? (()=>{ /* worked out now, so it follows this project's client */
             const list=liveOptions(k,opts,row);
             const extra=(v&&!list.includes(v))?[v]:[];
-            const show=o=>o===''?'— none —':(MAADEN_GRADE[o]?maadenLabel(o):o);
+            const maaden=projectClient(row.project_id)==='Maaden';
+            const show=o=>o===''?'— none —':((maaden&&MAADEN_GRADE[o])?maadenLabel(o):o);
             return `<select id="f-${k}"${dis}>${['',...list,...extra].map(o=>
               `<option value="${esc(o)}"${String(v)===o?' selected':''}>${esc(show(o))}</option>`
               ).join('')}</select>`; })()
@@ -2544,7 +2548,8 @@ function beginCellEdit(r,c,seed){
   if(kind==='sel'){
     el=document.createElement('select');
     const opts=liveOptions(col.k,f[3],row);
-    const show=o=>MAADEN_GRADE[o]?maadenLabel(o):o;
+    const maaden=projectClient(row&&row.project_id)==='Maaden';
+    const show=o=>(maaden&&MAADEN_GRADE[o])?maadenLabel(o):o;
     el.innerHTML=opts.map(o=>
         `<option value="${esc(o)}"${String(o)===cur?' selected':''}>${esc(show(o))}</option>`).join('')+
       ((cur&&!opts.includes(cur))?`<option value="${esc(cur)}" selected>${esc(show(cur))}</option>`:'');
@@ -2664,7 +2669,7 @@ function cardsHTML(rows,cols){
     return `<div class="mcard${late?' late':''}" data-open="${r.id}">
       ${ref?`<div class="mref">${esc(ref)}</div>`:''}
       <div class="mtitle2">${esc(title)}</div>
-      <div class="mmeta">${st?pill(st):''}${bits?`<span class="mbits">${esc(bits)}</span>`:''}</div>
+      <div class="mmeta">${st?pill(st,r):''}${bits?`<span class="mbits">${esc(bits)}</span>`:''}</div>
       ${dates.length?`<div class="mdates">${dates.map(([k,v])=>
         `<span><i>${k}</i>${esc(v)}</span>`).join('')}</div>`:''}
       ${late?'<div class="mlate">past its planned date</div>':''}
@@ -2722,7 +2727,7 @@ function paintTable(){
         const v=c.calc?c.calc(r):r[c.k];
         const txt=(v===null||v===undefined||v==='')?'':String(v);
         return `<td data-r="${ri}" data-c="${ci}" class="${c.cls||''} ${c.wrap?'wrapc':''}${fcls(ci)}"
-          style="${fsty(ci)}">${c.pill?pill(txt):esc(txt)}</td>`;}).join('')}</tr>`).join('')}
+          style="${fsty(ci)}">${c.pill?pill(txt,r):esc(txt)}</td>`;}).join('')}</tr>`).join('')}
     </tbody></table></div>`;
   $wrap().querySelectorAll('tbody tr[data-id]').forEach(tr=>
     tr.ondblclick=e=>{ if(!e.target.closest('td[data-r]'))openSheet(+tr.dataset.id); });
