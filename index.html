@@ -592,7 +592,7 @@ table.g tbody tr:hover .openb{color:var(--ink2)}
 <script>
 const SB_URL='https://ivmmnsjiekhjxkhllncb.supabase.co';
 const SB_KEY='sb_publishable_RTHsaxZXVmRBQziLbFJX8g_PAaZzIbF';
-const BUILD='ENG 2026-09-06 · e31';
+const BUILD='ENG 2026-09-06 · e32';
 
 let SESSION=null, ME=null;
 let PROJECTS=[], PEOPLE=[], AB=[], SD=[], GIS=[], HIST=[], INV=[];
@@ -922,6 +922,11 @@ function openSheet(id){
   if(!canEdit())return;
   fields.concat([['project_id','','sel']]).forEach(([k])=>{
     const el=document.getElementById('f-'+k); if(!el)return;
+    /* the same growing list of choices as the grid */
+    if(el.tagName==='INPUT'&&(el.type==='text'||!el.type)&&colChoices(k).length){
+      el.setAttribute('list',datalistFor(k));
+      el.setAttribute('autocomplete','off');
+    }
     el.onchange=async()=>{
       let val=el.value;
       if(k==='project_id')val=val?+val:null;
@@ -2124,6 +2129,38 @@ async function applyEdits(jobs,what){
   paintKpis&&paintKpis();
 }
 /* ---- editing one cell in place ---- */
+
+/* Anything already typed into a column becomes a choice next time. The list is
+   built from the values in that column across the whole register, commonest
+   first, and you can still type something new — so it grows by itself instead
+   of needing a list defined for every field. */
+function colChoices(key,tab){
+  const t=tab||TAB;
+  const rows=rowsOf(t)||[];
+  const count=new Map();
+  rows.forEach(r=>{
+    const v=r[key];
+    if(v===null||v===undefined)return;
+    const s=String(v).trim();
+    if(!s)return;
+    count.set(s,(count.get(s)||0)+1);
+  });
+  /* a column only earns a list if its values actually REPEAT — a document
+     number is different on every row, so offering all 217 of them is noise */
+  const list=[...count.entries()]
+    .sort((a,b)=>b[1]-a[1] || String(a[0]).localeCompare(String(b[0]),undefined,{numeric:true}));
+  const repeats=list.some(([,n])=>n>1);
+  if(!repeats || list.length>60)return [];
+  return list.map(([v])=>v);
+}
+function datalistFor(key,tab){
+  const id='dl-'+key;
+  let dl=document.getElementById(id);
+  if(!dl){ dl=document.createElement('datalist'); dl.id=id; document.body.appendChild(dl); }
+  dl.innerHTML=colChoices(key,tab).map(v=>`<option value="${esc(v)}">`).join('');
+  return id;
+}
+
 function beginCellEdit(r,c,seed){
   const row=GRIDROWS[r], col=GRIDCOLS[c]; if(!row||!col)return;
   const f=colEditable(col);
@@ -2139,6 +2176,12 @@ function beginCellEdit(r,c,seed){
     el=document.createElement('input');
     el.type = kind==='date'?'date' : kind==='num'?'number' : 'text';
     el.value = seed!==undefined?seed:cur;
+    /* a plain text column offers what has been used before, and still takes
+       anything new */
+    if(kind==='text'||kind==='area'){
+      if(colChoices(col.k).length){ el.setAttribute('list',datalistFor(col.k));
+        el.setAttribute('autocomplete','off'); }
+    }
   }
   el.className='cellin';
   td.innerHTML=''; td.appendChild(el); el.focus();
