@@ -863,6 +863,25 @@ table.g tbody tr:hover .openb{color:var(--ink2)}
 .dbar.focus i.on,.dtrack.focus i.on,.hbar.focus i.on{opacity:1}
 
 
+
+/* the loupe */
+#loupe{position:fixed;left:10px;right:10px;z-index:1600;display:none;
+  background:var(--surface2);border-radius:16px;box-shadow:0 14px 40px rgba(0,0,0,.55);
+  padding:11px 12px 9px;pointer-events:none}
+#loupe.on{display:block}
+#loupe .lptitle{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;
+  color:var(--ink3);margin-bottom:8px}
+#loupe .lprow{display:flex;gap:5px;align-items:stretch}
+#loupe .lpseg{flex:1;min-width:52px;border-radius:11px;padding:8px 6px 7px;
+  background:var(--chip);border:2px solid transparent;text-align:center;
+  transition:transform .1s,border-color .1s,background .1s}
+#loupe .lpseg i{display:block;height:5px;border-radius:3px;margin-bottom:6px}
+#loupe .lpseg b{display:block;font-size:17px;font-weight:750;color:var(--ink);line-height:1}
+#loupe .lpseg span{display:block;font-size:9.5px;line-height:1.2;margin-top:3px;
+  color:var(--ink3);overflow:hidden}
+#loupe .lpseg.on{border-color:var(--accent);background:var(--accent-soft);
+  transform:translateY(-3px)}
+#loupe .lphint{font-size:10px;color:var(--ink3);text-align:center;margin-top:8px}
 </style>
 <script>
 (()=>{ let t=null; try{ t=localStorage.getItem('eng_theme'); }catch(e){}
@@ -920,7 +939,7 @@ table.g tbody tr:hover .openb{color:var(--ink2)}
 <script>
 const SB_URL='https://ivmmnsjiekhjxkhllncb.supabase.co';
 const SB_KEY='sb_publishable_RTHsaxZXVmRBQziLbFJX8g_PAaZzIbF';
-const BUILD='ENG 2026-09-06 · e60';
+const BUILD='ENG 2026-09-06 · e61';
 
 let SESSION=null, ME=null;
 let PROJECTS=[], PEOPLE=[], AB=[], SD=[], GIS=[], HIST=[], INV=[];
@@ -3617,6 +3636,90 @@ document.addEventListener('scroll',hideTip,true);
 
 /* every coloured segment on the dashboard gets it */
 
+
+/* ===== THE LOUPE ========================================================
+   A one-record slice of a stacked bar is about two pixels wide on a phone.
+   Tapping it is luck, and the tap that lands opens the wrong filter — which
+   is worse than no tap at all. So a press on any bar lifts its segments out
+   into a strip above the finger, each one wide enough to hit and labelled
+   with its state and count. Slide to move between them, lift to apply the
+   same filter a tap would have applied, slide off to cancel. A quick tap
+   still behaves exactly as it did. */
+let LOUPE=null;
+function loupeEl(){
+  if(LOUPE&&document.body.contains(LOUPE))return LOUPE;
+  LOUPE=document.createElement('div');
+  LOUPE.id='loupe'; LOUPE.setAttribute('aria-hidden','true');
+  document.body.appendChild(LOUPE);
+  return LOUPE;
+}
+function hideLoupe(){ if(LOUPE)LOUPE.classList.remove('on'); }
+function attachLoupe(){
+  if(!isPhone())return;
+  document.querySelectorAll('.dbar,.dtrack,.hbar').forEach(bar=>{
+    if(bar._loupe)return; bar._loupe=1;
+    const segs=[...bar.querySelectorAll('i[data-rstate]')];
+    if(segs.length<2)return;               /* one block is already easy to hit */
+    bar.style.touchAction='none';
+    let live=false, pick=-1, blocks=[];
+    const info=sg=>{
+      const label=(sg.getAttribute('title')||'').trim();
+      const cut=label.lastIndexOf(' — ');
+      return {name:cut>0?label.slice(0,cut):label,
+              n:cut>0?label.slice(cut+3):(sg.textContent||'').trim(),
+              col:sg.style.background||sg.style.backgroundColor};
+    };
+    const open=y=>{
+      const el=loupeEl();
+      el.innerHTML=`<div class="lptitle">Pick a colour</div>
+        <div class="lprow">${segs.map((sg,i)=>{const d=info(sg);
+          return `<div class="lpseg" data-i="${i}" style="flex:${Math.max(1,parseInt(d.n)||1)}">
+            <i style="background:${d.col}"></i>
+            <b>${esc(d.n)}</b><span>${esc(d.name)}</span></div>`;}).join('')}</div>
+        <div class="lphint">Slide to choose · lift to filter</div>`;
+      el.classList.add('on');
+      const r=el.getBoundingClientRect();
+      el.style.top=Math.max(8,y-r.height-18)+'px';
+      blocks=[...el.querySelectorAll('.lpseg')];
+      live=true; pick=-1;
+    };
+    const at=x=>{
+      for(let i=0;i<blocks.length;i++){
+        const b=blocks[i].getBoundingClientRect();
+        if(x>=b.left&&x<=b.right)return i;
+      }
+      return -1;
+    };
+    const mark=i=>{
+      if(i===pick)return; pick=i;
+      blocks.forEach((b,j)=>b.classList.toggle('on',j===i));
+    };
+    bar.addEventListener('touchstart',e=>{
+      const t=e.touches[0]; if(!t)return;
+      open(bar.getBoundingClientRect().top);
+      /* start on whatever the finger is over in the ORIGINAL bar, so a plain
+         tap still picks the thing under the thumb */
+      let i=-1;
+      segs.forEach((sg,j)=>{const b=sg.getBoundingClientRect();
+        if(t.clientX>=b.left&&t.clientX<=b.right)i=j;});
+      mark(i>=0?i:at(t.clientX));
+    },{passive:true});
+    bar.addEventListener('touchmove',e=>{
+      if(!live)return;
+      const t=e.touches[0]; if(!t)return;
+      e.preventDefault();                  /* the page must not scroll under it */
+      mark(at(t.clientX));
+    },{passive:false});
+    const end=apply=>{
+      if(!live)return; live=false;
+      const i=pick; hideLoupe();
+      if(apply&&i>=0&&segs[i])segs[i].click();
+    };
+    bar.addEventListener('touchend',()=>end(true));
+    bar.addEventListener('touchcancel',()=>end(false));
+  });
+}
+
 function wireChartTips(){
   document.querySelectorAll('.dbar i,.dtrack i,.hbar i,.kpi .bar i').forEach(seg=>{
     if(seg._tip)return; seg._tip=1;
@@ -3784,7 +3887,7 @@ function paint(){
   $('crumb').textContent   = onReg?'':VIEWLABEL[VIEW]||'';
   $('crumb').style.display = onReg?'none':'';
   if(onReg){ paintTabs(); paintKpis(); paintTools(); paintTable(); }
-  else if(VIEW==='dash'){ paintKpis(); paintOverview(); wireDash(); wireRegCards(); wireChartTips();
+  else if(VIEW==='dash'){ paintKpis(); paintOverview(); wireDash(); wireRegCards(); wireChartTips(); attachLoupe();
     document.querySelectorAll('.dtbl tr[data-open]').forEach(tr=>
       tr.onclick=()=>{ VIEW='reg'; paint(); openSheet(+tr.dataset.open); }); }
   else if(VIEW==='plan'){ paintPlan(); }
