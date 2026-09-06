@@ -449,6 +449,37 @@ table.g tbody tr:hover td{background:var(--surface2)}
   display:inline-block;margin-right:5px}
 #statusline b{color:var(--ink2);font-weight:600}
 #statusline .sp{margin-left:auto}
+
+/* windows, the desktop and the taskbar */
+#desktop{position:absolute;inset:auto 0 26px 0;top:0;overflow:hidden;display:none}
+body.windowed #desktop{display:block;position:absolute;inset:0 0 26px 0}
+body.windowed .wrap{display:none}
+.win{position:absolute;background:var(--surface);border:1px solid var(--ring);border-radius:13px;
+  box-shadow:var(--shadow);display:flex;flex-direction:column;overflow:hidden;
+  min-width:320px;min-height:180px}
+.win.focus{box-shadow:var(--shadow-focus);border-color:var(--accent-soft2)}
+.wbar{height:34px;display:flex;align-items:center;gap:7px;padding:0 8px 0 12px;
+  background:var(--surface2);border-bottom:1px solid var(--ring);cursor:move;flex:none}
+.wt{font-weight:600;font-size:12.5px;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  color:var(--ink)}
+.wt small{color:var(--ink3);font-weight:400;margin-left:7px}
+.wb{border:none;background:none;color:var(--ink2);width:22px;height:22px;border-radius:6px;
+  cursor:pointer;font-size:13px;line-height:1;flex:none}
+.wb:hover{background:var(--chip);color:var(--ink)}
+.wbody{flex:1;overflow:auto;position:relative;padding:10px}
+.grip{position:absolute;z-index:5}
+.grip.e{right:0;top:34px;bottom:8px;width:6px;cursor:ew-resize}
+.grip.s{left:8px;right:8px;bottom:0;height:6px;cursor:ns-resize}
+.grip.se{right:0;bottom:0;width:14px;height:14px;cursor:nwse-resize}
+#dock{position:absolute;left:0;right:0;bottom:0;height:26px;display:none;gap:6px;
+  align-items:center;padding:0 10px;background:var(--surface);border-top:1px solid var(--ring);
+  font-size:11.5px;z-index:800;overflow-x:auto}
+#dock button{background:var(--chip);border:1px solid var(--ring);color:var(--ink2);
+  border-radius:6px;padding:2px 9px;font-size:11.5px;cursor:pointer;white-space:nowrap}
+#dock button.on{border-color:var(--accent);color:var(--ink)}
+#dock .st{margin-left:auto;color:var(--ink3);white-space:nowrap}
+#snapghost{position:absolute;border:2px solid var(--accent);background:var(--accent-soft);
+  border-radius:12px;display:none;pointer-events:none;z-index:700}
 </style>
 <script>
 (()=>{ let t=null; try{ t=localStorage.getItem('eng_theme'); }catch(e){}
@@ -477,6 +508,8 @@ table.g tbody tr:hover td{background:var(--surface2)}
     <button class="tbbtn" data-view="plan">▤ Plan</button>
     <button class="tbbtn" data-view="dash">◔ Dashboard</button>
     <button class="tbbtn" data-view="late">◷ Overdue</button>
+    <button class="tbbtn" id="winbtn" title="Open this view in a window — several can sit side by side">⧉ Window</button>
+    <button class="tbbtn" id="tidybtn" title="Tidy the windows" style="display:none">▦ Arrange</button>
     <div class="grow"></div>
     <span class="who" id="who"></span>
     <button class="iconb" id="out" title="Sign out">⎋</button>
@@ -489,6 +522,9 @@ table.g tbody tr:hover td{background:var(--surface2)}
     <div class="tools" id="tools"></div>
   </header>
   <div class="wrap" id="wrap"></div>
+  <div id="desktop"></div>
+  <div id="snapghost"></div>
+  <div id="dock"></div>
 </div>
 <button id="fab" title="New record">+</button>
 <nav id="mtabs"></nav>
@@ -498,7 +534,7 @@ table.g tbody tr:hover td{background:var(--surface2)}
 <script>
 const SB_URL='https://ivmmnsjiekhjxkhllncb.supabase.co';
 const SB_KEY='sb_publishable_RTHsaxZXVmRBQziLbFJX8g_PAaZzIbF';
-const BUILD='ENG 2026-08-31 · e18';
+const BUILD='ENG 2026-08-31 · e19';
 
 let SESSION=null, ME=null;
 let PROJECTS=[], PEOPLE=[], AB=[], SD=[], GIS=[], HIST=[], INV=[];
@@ -510,6 +546,11 @@ const isoDay=d=>{const x=(d instanceof Date)?d:new Date(d);
 const today=isoDay(new Date());
 const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const $=id=>document.getElementById(id);
+/* While a window is drawing, everything the painters write into #wrap goes
+   into that window's body instead. One switch, so every existing view works
+   inside a window with no other change. */
+let PAINT_TARGET=null;
+const $wrap=()=>PAINT_TARGET||document.getElementById('wrap');
 
 async function api(path,opts={},tries=0){
   const r=await fetch(SB_URL+'/rest/v1/'+path,{...opts,headers:{
@@ -761,7 +802,7 @@ function goDrill(tab,field,value,state,label){
   DRILL={tab,field,value,state,label};
   TAB=tab; VIEW='reg'; F=''; Q=''; DF={field:'',from:'',to:''};
   paint();
-  const w=$('wrap'); if(w)w.scrollTop=0;
+  const w=$wrap(); if(w)w.scrollTop=0;
   const n=rowsNow().length;
   toast(n+' record'+(n===1?'':'s')+' · '+label);
 }
@@ -1005,12 +1046,16 @@ function goView(v){
   VIEW=v;
   if(v==='reg'&&TAB==='overview')TAB='shop';
   paint();
-  const wrap=$('wrap'); if(wrap)wrap.scrollTop=0;
+  const wrap=$wrap(); if(wrap)wrap.scrollTop=0;
 }
 function paintNav(){
   document.querySelectorAll('#topbar [data-view]').forEach(b=>{
     b.classList.toggle('on', b.dataset.view===VIEW);
     b.onclick=()=>goView(b.dataset.view);});
+  const wb=document.getElementById('winbtn');
+  if(wb)wb.onclick=()=>openCurrentAsWindow();
+  const tb=document.getElementById('tidybtn');
+  if(tb)tb.onclick=()=>arrangeWins();
   const tabs=[['dash','Overview'],['reg','Register'],['plan','Plan'],['late','Overdue'],['more','More']];
   $('mtabs').innerHTML=tabs.map(([v,l])=>{
     const n = v==='late'?overdueRows().length : 0;
@@ -1034,10 +1079,10 @@ function overdueRows(){
 const daysLate=d=>Math.round((new Date(today)-new Date(d))/864e5);
 function paintOverdue(){
   const rows=overdueRows();
-  if(!rows.length){ $('wrap').innerHTML=`<div class="empty"><div class="big">✅</div>
+  if(!rows.length){ $wrap().innerHTML=`<div class="empty"><div class="big">✅</div>
     <b>Nothing is overdue</b>Every planned submission is still within its date.</div>`;
     return; }
-  $('wrap').innerHTML=`<div class="cards">${rows.map((r,i)=>`
+  $wrap().innerHTML=`<div class="cards">${rows.map((r,i)=>`
     <article class="lcard" data-go="${r.tab}:${r.id}" style="animation-delay:${Math.min(i,14)*24}ms">
       <div class="lc-top"><span class="tagk">${esc(r.kind)}</span>
         <b>${esc(r.ref||'—')}</b>
@@ -1045,7 +1090,7 @@ function paintOverdue(){
       <div class="lc-what">${esc(r.what||'')}</div>
       <div class="lc-meta">Due ${esc(r.due)} · ${esc(r.state)}</div>
     </article>`).join('')}</div>`;
-  $('wrap').querySelectorAll('[data-go]').forEach(el=>el.onclick=()=>{
+  $wrap().querySelectorAll('[data-go]').forEach(el=>el.onclick=()=>{
     const [tab,id]=el.dataset.go.split(':');
     TAB=tab; VIEW='reg'; paint(); openSheet(+id);});
 }
@@ -1068,7 +1113,7 @@ function paintPlan(){
   const late=items.filter(r=>!r.submitted_date&&r.planned_date<today).length;
   const pct=items.length?Math.round(done/items.length*100):0;
   const fmt=d=>new Date(d+'T00:00:00').toLocaleDateString('en-GB',{day:'numeric',month:'short'});
-  $('wrap').innerHTML=`
+  $wrap().innerHTML=`
     <div class="planbar">
       <button class="btn" id="wprev">‹</button>
       <div class="wk"><b>${fmt(from)} – ${fmt(to)}</b>
@@ -1099,14 +1144,14 @@ function paintPlan(){
   $('wprev').onclick=()=>{WEEK--;paintPlan();};
   $('wnext').onclick=()=>{WEEK++;paintPlan();};
   $('wnow').onclick=()=>{WEEK=0;paintPlan();};
-  $('wrap').querySelectorAll('[data-go]').forEach(el=>el.onclick=()=>{
+  $wrap().querySelectorAll('[data-go]').forEach(el=>el.onclick=()=>{
     const [tab,id]=el.dataset.go.split(':');
     TAB=tab; VIEW='reg'; paint(); openSheet(+id);});
 }
 
 /* ---------- More (phone) ---------- */
 function paintMore(){
-  $('wrap').innerHTML=`<div class="cards">
+  $wrap().innerHTML=`<div class="cards">
     ${[['reg','Register','Browse and edit every record'],
        ['plan','Plan','What is due to go out, week by week'],
        ['dash','Dashboard','Totals, breakdowns and day by day'],
@@ -1118,7 +1163,7 @@ function paintMore(){
     <article class="lcard" id="mout"><div class="lc-top"><b>Sign out</b></div></article>
     <article class="lcard"><div class="lc-meta">${esc(BUILD)}</div></article>
   </div>`;
-  $('wrap').querySelectorAll('[data-mv]').forEach(el=>el.onclick=()=>goView(el.dataset.mv));
+  $wrap().querySelectorAll('[data-mv]').forEach(el=>el.onclick=()=>goView(el.dataset.mv));
   $('mout').onclick=()=>{try{localStorage.removeItem('eng-session');}catch(e){}location.reload();};
 }
 
@@ -1359,6 +1404,189 @@ function paintStatus(){
   el.style.display='flex';
 }
 
+
+/* ============================================================
+   Windows — the same manager the LOD tracker uses: drag by the bar,
+   resize from the edges, snap to half or full by dragging to an edge,
+   minimise to the taskbar, and a dock along the bottom.
+   ============================================================ */
+const WINS=new Map(); let winSeq=0, focused=null;
+const desk=()=>document.getElementById('desktop');
+let WINMODE=false;                       /* off until the first window opens */
+
+function setWinMode(on){
+  WINMODE=on;
+  document.body.classList.toggle('windowed',on);
+  const d=desk(), k=document.getElementById('dock');
+  if(d)d.style.display=on?'block':'none';
+  if(k)k.style.display=on?'flex':'none';
+  const wrap=document.getElementById('wrap');
+  if(wrap)wrap.style.display=on?'none':'';
+}
+function createWindow(kind,title,sub,draw,x,y,w,h){
+  const ex=[...WINS.values()].find(v=>v.kind===kind);
+  if(ex){ focusWin(ex.id); return ex; }
+  if(!WINMODE)setWinMode(true);
+  const id='w'+(++winSeq), D=desk();
+  const win={id,kind,title,sub,draw,min:false,max:false,
+    x:x??(24+WINS.size*26), y:y??(18+WINS.size*22),
+    w:w??Math.min(1180,D.clientWidth-60), h:h??Math.min(660,D.clientHeight-50)};
+  const el=document.createElement('div');
+  el.className='win'; el.id=id;
+  el.innerHTML=`<div class="wbar"><div class="wt">${esc(title)}<small>${esc(sub||'')}</small></div>
+      <button class="wb" data-w="min" title="Minimise">–</button>
+      <button class="wb" data-w="max" title="Maximise">▢</button>
+      <button class="wb" data-w="close" title="Close">✕</button></div>
+    <div class="wbody"></div>
+    <div class="grip e"></div><div class="grip s"></div><div class="grip se"></div>`;
+  D.appendChild(el);
+  win.el=el; win.body=el.querySelector('.wbody');
+  WINS.set(id,win); applyRect(win); focusWin(id);
+  el.addEventListener('pointerdown',()=>focusWin(id),true);
+  el.querySelector('.wbar').addEventListener('pointerdown',e=>{
+    if(e.target.closest('.wb'))return; startDrag(e,win);});
+  el.querySelectorAll('.wb').forEach(b=>b.onclick=()=>{
+    const a=b.dataset.w;
+    if(a==='close')closeWin(id);
+    else if(a==='min'){win.min=true;applyRect(win);renderDock();}
+    else{win.max=!win.max;applyRect(win);}});
+  el.querySelector('.grip.e').addEventListener('pointerdown',e=>startResize(e,win,1,0));
+  el.querySelector('.grip.s').addEventListener('pointerdown',e=>startResize(e,win,0,1));
+  el.querySelector('.grip.se').addEventListener('pointerdown',e=>startResize(e,win,1,1));
+  drawWin(win); renderDock();
+  return win;
+}
+function drawWin(w){
+  const keepT=PAINT_TARGET, keepTab=TAB, keepView=VIEW;
+  try{
+    PAINT_TARGET=w.body;
+    if(w.tab)TAB=w.tab;
+    if(w.view)VIEW=w.view;
+    w.draw(w);
+  }catch(e){
+    w.body.innerHTML='<div class="empty"><b>Could not draw this window</b><br>'+esc(e.message)+'</div>';
+  }finally{ PAINT_TARGET=keepT; TAB=keepTab; VIEW=keepView; }
+}
+function redrawWins(){ WINS.forEach(w=>drawWin(w)); renderDock(); }
+function applyRect(w){
+  const D=desk(), el=w.el;
+  if(w.min){el.style.display='none';return;}
+  el.style.display='flex';
+  if(w.max){Object.assign(el.style,{left:'6px',top:'6px',
+    width:(D.clientWidth-12)+'px',height:(D.clientHeight-12)+'px'});return;}
+  w.x=Math.max(-w.w+120,Math.min(w.x,D.clientWidth-80));
+  w.y=Math.max(0,Math.min(w.y,D.clientHeight-40));
+  Object.assign(el.style,{left:w.x+'px',top:w.y+'px',width:w.w+'px',height:w.h+'px'});
+}
+function focusWin(id){
+  focused=id;
+  [...WINS.values()].forEach(w=>w.el.classList.toggle('focus',w.id===id));
+  const w=WINS.get(id);
+  if(w){ w.el.style.zIndex=++winSeq+100;
+    if(w.min){w.min=false;applyRect(w);renderDock();} }
+}
+function closeWin(id){
+  const w=WINS.get(id); if(!w)return;
+  w.el.remove(); WINS.delete(id); renderDock();
+  if(!WINS.size)setWinMode(false);          /* back to the plain view */
+}
+function arrangeWins(){
+  const list=[...WINS.values()].filter(w=>!w.min); if(!list.length)return;
+  const D=desk(), cols=Math.ceil(Math.sqrt(list.length)), rows=Math.ceil(list.length/cols);
+  list.forEach((w,i)=>{ w.max=false;
+    w.w=Math.floor(D.clientWidth/cols)-10; w.h=Math.floor(D.clientHeight/rows)-10;
+    w.x=(i%cols)*(w.w+8)+6; w.y=Math.floor(i/cols)*(w.h+8)+6; applyRect(w);});
+  toast('Windows tidied');
+}
+function renderDock(){
+  const d=document.getElementById('dock'); if(!d)return;
+  const t=document.getElementById('tidybtn'); if(t)t.style.display=WINS.size?'':'none';
+  d.innerHTML=[...WINS.values()].map(w=>
+      `<button data-d="${w.id}"${w.id===focused?' class="on"':''}>${w.min?'▫ ':''}${esc(w.title)}</button>`).join('')
+    +`<span class="st">${dockStatus()}</span>`;
+  d.querySelectorAll('[data-d]').forEach(b=>b.onclick=()=>focusWin(b.dataset.d));
+}
+function dockStatus(){
+  const n=rowsOf(TAB).length, label=(TABS.find(t=>t.k===TAB)||{}).t||'';
+  return '● live · '+n+' '+String(label).toLowerCase()+
+    ' · '+(PROJ?projName(PROJ):'All projects')+
+    (ME?' · '+ME.name:'')+' · build '+BUILD;
+}
+let _drag=null;
+function startDrag(e,w){
+  if(w.max)return;
+  _drag={w,dx:e.clientX-w.x,dy:e.clientY-w.y,mode:'move'};
+  try{e.target.setPointerCapture(e.pointerId);}catch(_){}
+  document.addEventListener('pointermove',dragMove);
+  document.addEventListener('pointerup',dragEnd,{once:true});
+}
+function startResize(e,w,ex,ey){
+  if(w.max)return;
+  _drag={w,sx:e.clientX,sy:e.clientY,w0:w.w,h0:w.h,ex,ey,mode:'size'};
+  try{e.target.setPointerCapture(e.pointerId);}catch(_){}
+  document.addEventListener('pointermove',dragMove);
+  document.addEventListener('pointerup',dragEnd,{once:true});
+  e.preventDefault();
+}
+function dragMove(e){
+  if(!_drag)return;
+  const w=_drag.w, D=desk(), g=document.getElementById('snapghost');
+  if(_drag.mode==='move'){
+    w.x=e.clientX-_drag.dx; w.y=e.clientY-_drag.dy; applyRect(w);
+    const r=D.getBoundingClientRect(), px=e.clientX-r.left, py=e.clientY-r.top;
+    let z=null;
+    if(px<28)z={left:0,top:0,width:D.clientWidth/2,height:D.clientHeight};
+    else if(px>D.clientWidth-28)z={left:D.clientWidth/2,top:0,width:D.clientWidth/2,height:D.clientHeight};
+    else if(py<10)z={left:0,top:0,width:D.clientWidth,height:D.clientHeight};
+    _drag.zone=z;
+    if(z&&g)Object.assign(g.style,{display:'block',left:z.left+'px',top:z.top+'px',
+      width:z.width+'px',height:z.height+'px'});
+    else if(g)g.style.display='none';
+  }else{
+    if(_drag.ex)w.w=Math.max(340,_drag.w0+(e.clientX-_drag.sx));
+    if(_drag.ey)w.h=Math.max(190,_drag.h0+(e.clientY-_drag.sy));
+    applyRect(w);
+  }
+}
+function dragEnd(){
+  document.removeEventListener('pointermove',dragMove);
+  const g=document.getElementById('snapghost'); if(g)g.style.display='none';
+  if(_drag&&_drag.zone){ const w=_drag.w,z=_drag.zone;
+    w.x=z.left;w.y=z.top;w.w=z.width;w.h=z.height;w.max=false;applyRect(w); }
+  _drag=null;
+}
+window.addEventListener('resize',()=>WINS.forEach(w=>applyRect(w)));
+/* open whatever is on screen as a window */
+function openCurrentAsWindow(){
+  if(VIEW==='reg')      openRegisterWindow(TAB);
+  else if(VIEW==='dash')openDashWindow();
+  else if(VIEW==='plan')openPlanWindow();
+  else if(VIEW==='late')openOverdueWindow();
+  else openRegisterWindow(TAB);
+  const t=document.getElementById('tidybtn'); if(t)t.style.display='';
+}
+
+/* what each window draws — the ordinary painters, pointed at the window */
+function openRegisterWindow(tab){
+  const t=tab||TAB, label=(TABS.find(x=>x.k===t)||{}).t||'Register';
+  const win=createWindow('reg:'+t,'Register · '+label,
+    rowsOf(t).length+' records', w=>paintTable());
+  win.tab=t; win.view='reg'; drawWin(win);
+}
+function openDashWindow(){
+  const win=createWindow('dash','Dashboard',
+    (TABS.find(x=>x.k===TAB)||{}).t||'', w=>paintOverview());
+  win.tab=TAB; win.view='dash'; drawWin(win);
+}
+function openPlanWindow(){
+  const win=createWindow('plan','Plan','this week', w=>paintPlan());
+  win.view='plan'; drawWin(win);
+}
+function openOverdueWindow(){
+  const win=createWindow('late','Overdue','past its date', w=>paintOverdue());
+  win.view='late'; drawWin(win);
+}
+
 function paintTable(){
 
   const cols=COLS[TAB], rows=rowsNow();
@@ -1367,7 +1595,7 @@ function paintTable(){
      :TAB==='shop'?sdFor().length:TAB==='invoice'?invFor().length:abFor().length);
   if(!rows.length){
     const none = TAB==='asbuilts' && AB.length===0;
-    $('wrap').innerHTML=`<div class="empty"><div class="big">${none?'📥':'🔍'}</div>
+    $wrap().innerHTML=`<div class="empty"><div class="big">${none?'📥':'🔍'}</div>
       <b>${none?'The as-built register is still being moved':'Nothing matches'}</b>
       ${none?'The other registers are already here. The 687 as-built rows come across next.'
             :'Try a different search or filter.'}</div>`;
@@ -1377,7 +1605,7 @@ function paintTable(){
   const fz=Math.min(COLPREF.freeze||0,vcols.length);
   const fcls=i=>i<fz?(' frz'+(i===fz-1?' frzlast':'')):'';
   const fsty=i=>i<fz?`left:${frozenLeft(vcols,i)}px;`:'';
-  $('wrap').innerHTML=`<table class="g"><thead><tr>${vcols.map((c,ci)=>
+  $wrap().innerHTML=`<table class="g"><thead><tr>${vcols.map((c,ci)=>
       `<th data-k="${c.k}" class="${fcls(ci).trim()}" style="${fsty(ci)}width:${COLPREF.w[c.k]||c.w}px"
         title="Right-click, or shift-click, for column options">${c.t}${
         SORT.k===c.k?(SORT.dir>0?' ▲':' ▼'):''}</th>`).join('')}</tr></thead>
@@ -1388,8 +1616,8 @@ function paintTable(){
         return `<td class="${c.cls||''} ${c.wrap?'wrapc':''}${fcls(ci)}" style="${fsty(ci)}">${
           c.pill?pill(txt):esc(txt)}</td>`;}).join('')}</tr>`).join('')}
     </tbody></table>`;
-  $('wrap').querySelectorAll('tbody tr[data-id]').forEach(tr=>tr.onclick=()=>openSheet(+tr.dataset.id));
-  $('wrap').querySelectorAll('th[data-k]').forEach(th=>{
+  $wrap().querySelectorAll('tbody tr[data-id]').forEach(tr=>tr.onclick=()=>openSheet(+tr.dataset.id));
+  $wrap().querySelectorAll('th[data-k]').forEach(th=>{
     th.oncontextmenu=e=>colMenu(e,th.dataset.k,vcols);
     th.onclick=e=>{
       if(e.shiftKey){ colMenu(e,th.dataset.k,vcols); return; }
@@ -1499,7 +1727,7 @@ function wireRegCards(){
 function paintOverview(){
   /* drawn below, then wired */
   const ab=abFor(), gi=gisFor();
-  $('wrap').innerHTML=`${regCards(TAB)}<div class="panels">
+  $wrap().innerHTML=`${regCards(TAB)}<div class="panels">
     ${bars('As-builts by project', group(ab,r=>projName(r.project_id),r=>AB_DONE(r.status),
         r=>r.project_id),'var(--hot)',{tab:'asbuilts',field:'project_id'})}
     ${bars('As-builts by discipline', group(ab,r=>r.discipline,r=>AB_DONE(r.status)),
@@ -1538,7 +1766,7 @@ function wireDash(){
       DRILL=null; TAB=tab; VIEW='reg'; F=(state==='done'?'done':'open'); Q='';
       DF={field:'',from:'',to:''};
       paint();
-      const w=$('wrap'); if(w)w.scrollTop=0;
+      const w=$wrap(); if(w)w.scrollTop=0;
       toast(rowsNow().length+' · '+label);};});
 }
 function wireDaily(){
