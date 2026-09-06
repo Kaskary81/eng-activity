@@ -556,6 +556,7 @@ table.g th.dropR{box-shadow:inset -3px 0 0 var(--accent)}
     <button class="tbbtn" id="winbtn" title="Open this view in a window — several can sit side by side">⧉ Window</button>
     <button class="tbbtn" id="tidybtn" title="Tidy the windows" style="display:none">▦ Arrange</button>
     <div class="grow"></div>
+    <button class="iconb" id="alerts" title="Alerts and sound">🔔</button>
     <span class="who" id="who"></span>
     <button class="iconb" id="out" title="Sign out">⎋</button>
   </div>
@@ -579,7 +580,7 @@ table.g th.dropR{box-shadow:inset -3px 0 0 var(--accent)}
 <script>
 const SB_URL='https://ivmmnsjiekhjxkhllncb.supabase.co';
 const SB_KEY='sb_publishable_RTHsaxZXVmRBQziLbFJX8g_PAaZzIbF';
-const BUILD='ENG 2026-09-06 · e27';
+const BUILD='ENG 2026-09-06 · e28';
 
 let SESSION=null, ME=null;
 let PROJECTS=[], PEOPLE=[], AB=[], SD=[], GIS=[], HIST=[], INV=[];
@@ -1363,6 +1364,7 @@ function paintTools(){
     try{ localStorage.setItem('eng_wrap',WRAPCELLS?'1':'0'); }catch(e){}
     paint(); };
   if($('filld'))$('filld').onclick=()=>fillDown();
+  if($('alerts'))$('alerts').onclick=()=>alertsBox();
   $('tools').querySelectorAll('[data-f]').forEach(b=>b.onclick=()=>{F=b.dataset.f;paint();});
   if($('cleardrill'))$('cleardrill').onclick=clearDrill;
   if($('newrec'))$('newrec').onclick=newRecord;
@@ -1566,11 +1568,182 @@ function toggleTheme(){
 
 
 /* the line along the bottom, as the LOD has: what is loaded and who you are */
+
+/* ============================================================
+   Live updates. The Supabase realtime endpoint speaks plain JSON over a
+   websocket, so no library is needed. A slow poll runs underneath in case
+   the socket cannot be had at all.
+   ============================================================ */
+let LIVEWS=null, LIVE_OK=false, _wsTries=0, _pollT=null, _syncT=null;
+let LASTSEEN={};                 /* table -> the highest id we have shown */
+
+function startLive(){
+  clearInterval(_pollT);
+  _pollT=setInterval(()=>{ if(!document.hidden)syncSoon(); }, 20000);
+  connectLive();
+}
+function connectLive(){
+  if(!SESSION||!window.WebSocket)return;
+  try{ if(LIVEWS)LIVEWS.close(); }catch(e){}
+  let ws;
+  try{
+    ws=new WebSocket(SB_URL.replace(/^http/,'ws')+
+      '/realtime/v1/websocket?apikey='+encodeURIComponent(SB_KEY)+'&vsn=1.0.0');
+  }catch(e){ return; }
+  LIVEWS=ws;
+  let ref=0, hb=null;
+  const send=(topic,event,payload)=>{
+    try{ ws.send(JSON.stringify({topic,event,payload:payload||{},ref:String(++ref)})); }catch(e){}
+  };
+  ws.onopen=()=>{
+    send('realtime:eng','phx_join',{
+      config:{broadcast:{self:false},presence:{key:''},
+        postgres_changes:[
+          {event:'*',schema:'public',table:'eng_shopdrawings'},
+          {event:'*',schema:'public',table:'eng_asbuilts'},
+          {event:'*',schema:'public',table:'eng_gis'},
+          {event:'*',schema:'public',table:'eng_invoice_sections'},
+          {event:'*',schema:'public',table:'eng_history'}]},
+      access_token:SESSION.access_token});
+    hb=setInterval(()=>send('phoenix','heartbeat',{}),25000);
+  };
+  ws.onmessage=e=>{
+    let m=null; try{ m=JSON.parse(e.data); }catch(_){ return; }
+    if(m.event==='phx_reply'&&m.payload&&m.payload.status==='ok'&&m.topic==='realtime:eng'){
+      LIVE_OK=true; _wsTries=0; paintStatus&&paintStatus();
+      clearInterval(_pollT);
+      _pollT=setInterval(()=>{ if(!document.hidden)syncSoon(); }, 60000);
+    }
+    if(m.event==='postgres_changes'||m.event==='INSERT'||m.event==='UPDATE'||m.event==='DELETE')
+      syncSoon(m.payload);
+    if(m.event==='system'&&m.payload&&/error/i.test(m.payload.status||''))LIVE_OK=false;
+  };
+  const bail=()=>{
+    clearInterval(hb); LIVE_OK=false; paintStatus&&paintStatus();
+    clearInterval(_pollT);
+    _pollT=setInterval(()=>{ if(!document.hidden)syncSoon(); }, 20000);
+    if(SESSION){ const wait=Math.min(60000,2000*Math.pow(2,Math.min(_wsTries++,4)));
+      setTimeout(()=>{ if(SESSION&&(!LIVEWS||LIVEWS.readyState>1))connectLive(); },wait); }
+  };
+  ws.onclose=bail; ws.onerror=()=>{ try{ws.close();}catch(e){} };
+}
+/* changes arrive in bursts; reload once when they stop */
+function syncSoon(payload){
+  clearTimeout(_syncT);
+  _syncT=setTimeout(async()=>{
+    if(document.querySelector('.cellin'))return syncSoon();   /* wait for the typing to finish */
+    const before=snapshotIds();
+    await loadAll();
+    const fresh=newSince(before);
+    paint();
+    if(fresh.length)announce(fresh);
+  }, 600);
+}
+function snapshotIds(){
+  const m={};
+  [['shop',SD],['asbuilts',AB],['gis',GIS],['invoice',INV]].forEach(([k,arr])=>{
+    m[k]=new Set((arr||[]).map(r=>r.id));
+  });
+  return m;
+}
+function newSince(before){
+  const out=[];
+  [['shop',SD,'shop drawing'],['asbuilts',AB,'as-built'],
+   ['gis',GIS,'GIS record'],['invoice',INV,'invoice section']].forEach(([k,arr,label])=>{
+    (arr||[]).forEach(r=>{ if(before[k]&&!before[k].has(r.id))out.push({label,row:r,tab:k}); });
+  });
+  return out;
+}
+
+/* ---- the chime, the toast and the desktop alert ---- */
+let AC=null;
+function audioCtx(){
+  if(AC)return AC;
+  const C=window.AudioContext||window.webkitAudioContext; if(!C)return null;
+  try{ AC=new C(); }catch(e){ return null; }
+  return AC;
+}
+document.addEventListener('pointerdown',()=>{
+  const c=audioCtx(); if(c&&c.state==='suspended')c.resume().catch(()=>{});
+});
+const ALPREF=()=>{ try{ return JSON.parse(localStorage.getItem('eng_alerts')||'{}'); }catch(e){ return {}; } };
+const ALSAVE=o=>{ try{ localStorage.setItem('eng_alerts',JSON.stringify(o)); }catch(e){} };
+function chime(){
+  const p=ALPREF(); if(p.sound===false)return;
+  const c=audioCtx(); if(!c||c.state!=='running')return;
+  const t=c.currentTime, vol=Math.max(0,Math.min(1,p.vol==null?0.35:p.vol));
+  [[392,0],[587.33,0.09]].forEach(([hz,at],i)=>{
+    const o=c.createOscillator(), g=c.createGain();
+    o.type='sine'; o.frequency.value=hz;
+    const peak=vol*(i?0.5:0.8), st=t+at;
+    g.gain.setValueAtTime(0.0001,st);
+    g.gain.exponentialRampToValueAtTime(Math.max(0.0002,peak),st+0.012);
+    g.gain.exponentialRampToValueAtTime(0.0001,st+1.15);
+    o.connect(g); g.connect(c.destination);
+    o.start(st); o.stop(st+1.2);
+  });
+}
+function announce(fresh){
+  if(!fresh.length)return;
+  chime();
+  const n=fresh.length, f=fresh[0];
+  const what=(f.row.description||f.row.doc_no||f.label);
+  const title=n===1?what:(n+' new records');
+  const body=n===1?(f.label+(f.row.discipline?' · '+f.row.discipline:''))
+                  :(what+' and '+(n-1)+' more');
+  if(document.hidden&&window.Notification&&Notification.permission==='granted'){
+    try{
+      const note=new Notification(title,{body,tag:'eng',icon:''});
+      note.onclick=()=>{ window.focus(); note.close();
+        TAB=f.tab; VIEW='reg'; paint(); openSheet&&openSheet(f.row.id); };
+    }catch(e){}
+  }
+  toast(n===1?('New — '+what):(n+' new records came in'));
+}
+function alertsBox(){
+  const p=ALPREF(), on=p.sound!==false, v=Math.round((p.vol==null?0.35:p.vol)*100);
+  const perm=window.Notification?Notification.permission:'unsupported';
+  msgBox('Alerts and sound',
+    `<div class="hint" style="margin-bottom:10px">The register watches for other
+       people's changes and brings them in on its own. This is what it does when
+       something arrives.</div>
+     <label class="fl">Bell</label>
+     <label style="display:flex;align-items:center;gap:8px;margin:4px 0 10px">
+       <input type="checkbox" id="alsnd"${on?' checked':''}>
+       <span>Play a soft chime for anything new</span></label>
+     <label class="fl">Volume</label>
+     <input type="range" class="f" id="alvol" min="0" max="100" value="${v}" style="padding:0;height:26px">
+     <div style="margin-top:8px"><button class="btn" id="altest">Hear it</button></div>
+     <label class="fl" style="margin-top:12px">Desktop alerts</label>
+     <div class="hint">${perm==='granted'?'On — alerts appear when this tab is in the background.'
+        :perm==='denied'?'Blocked by the browser. Turn them back on in the padlock menu beside the address bar.'
+        :perm==='unsupported'?'This browser cannot show desktop alerts.'
+        :'Off — the browser will ask you once.'}</div>
+     ${perm==='default'?'<div style="margin-top:6px"><button class="btn" id="alask">Turn on desktop alerts</button></div>':''}
+     <div class="hint" style="margin-top:12px">Updates arrive
+       <b>${LIVE_OK?'live, within a second':'about every 20 seconds'}</b>.</div>`,
+    [['Done',null,'primary']]);
+  const m=document.getElementById('msg');
+  const snd=m.querySelector('#alsnd'), vol=m.querySelector('#alvol');
+  const apply=()=>{ const q=ALPREF(); q.sound=snd.checked; q.vol=(+vol.value||0)/100; ALSAVE(q); };
+  snd.onchange=apply;
+  vol.onchange=()=>{ apply(); chime(); };
+  const t=m.querySelector('#altest'); if(t)t.onclick=()=>{ apply(); chime(); };
+  const k=m.querySelector('#alask'); if(k)k.onclick=()=>{ askForAlerts(); };
+}
+function askForAlerts(){
+  if(!window.Notification)return toast('This browser cannot show desktop alerts');
+  if(Notification.permission==='granted')return toast('Desktop alerts are already on');
+  Notification.requestPermission().then(p=>
+    toast(p==='granted'?'Desktop alerts are on':'Desktop alerts stay off'));
+}
+
 function paintStatus(){
   const el=document.getElementById('statusline'); if(!el)return;
   const n=rowsOf(TAB).length, label=(TABS.find(t=>t.k===TAB)||{}).t||'';
   const late=(typeof overdueList==='function')?overdueList().length:0;
-  el.innerHTML=`<span><span class="dot"></span>live</span>`+
+  el.innerHTML=`<span><span class="dot" style="background:${LIVE_OK?'var(--good)':'var(--warn)'}"></span>${
+      LIVE_OK?'live':'checking every 20s'}</span>`+
     `<span><b>${n}</b> ${esc(String(label).toLowerCase())}</span>`+
     `<span><b>${PROJ?esc(projName(PROJ)):'All projects'}</b></span>`+
     (late?`<span><b>${late}</b> overdue</span>`:'')+
@@ -2442,6 +2615,7 @@ function start(){
   $('who').textContent=(ME&&ME.name)||((SESSION.user&&SESSION.user.email)||'').split('@')[0];
   SORT={k:COLS[TAB][0].k,dir:1};
   paint();
+  try{ startLive(); }catch(e){ console.warn('Live updates unavailable',e); }
 }
 /* Names come from the directory; each carries the sign-in address this app
    uses. There is no password to type — see APP_PW below. */
