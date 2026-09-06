@@ -862,22 +862,7 @@ table.g tbody tr:hover .openb{color:var(--ink2)}
 .dbar.focus i,.dtrack.focus i,.hbar.focus i{opacity:.26;transition:opacity .12s}
 .dbar.focus i.on,.dtrack.focus i.on,.hbar.focus i.on{opacity:1}
 
-/* the magnifier */
-.mag{position:fixed;z-index:3200;min-width:230px;max-width:min(340px,92vw);padding:6px;
-  background:var(--surface2);border:1px solid var(--ring);border-radius:13px;
-  box-shadow:0 18px 44px rgba(0,0,0,.55);opacity:0;transform:translateY(-4px);
-  transition:opacity .14s var(--ease),transform .14s var(--ease)}
-.mag.on{opacity:1;transform:none}
-.mag .maghd{font-size:9.5px;font-weight:700;letter-spacing:.11em;text-transform:uppercase;
-  color:var(--ink3);padding:6px 9px 8px;border-bottom:1px solid var(--line);margin-bottom:4px}
-.mag button{display:flex;align-items:center;gap:10px;width:100%;background:none;border:none;
-  color:var(--ink);font:inherit;font-size:13px;text-align:left;padding:10px 9px;
-  border-radius:9px;cursor:pointer}
-.mag button:hover{background:var(--chip)}
-.mag button i{width:13px;height:13px;border-radius:4px;flex:none}
-.mag .mn{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.mag .mc{font-family:var(--mono);font-weight:700;font-size:12.5px}
-.mag .mp{font-family:var(--mono);font-size:11px;color:var(--ink3);width:38px;text-align:right}
+
 </style>
 <script>
 (()=>{ let t=null; try{ t=localStorage.getItem('eng_theme'); }catch(e){}
@@ -935,7 +920,7 @@ table.g tbody tr:hover .openb{color:var(--ink2)}
 <script>
 const SB_URL='https://ivmmnsjiekhjxkhllncb.supabase.co';
 const SB_KEY='sb_publishable_RTHsaxZXVmRBQziLbFJX8g_PAaZzIbF';
-const BUILD='ENG 2026-09-06 · e59';
+const BUILD='ENG 2026-09-06 · e60';
 
 let SESSION=null, ME=null;
 let PROJECTS=[], PEOPLE=[], AB=[], SD=[], GIS=[], HIST=[], INV=[];
@@ -3547,7 +3532,12 @@ function invSections(states){
           <i style="flex:${g.n-g.dn};background:var(--warn)"></i></div>
         <div class="dn">${km(g.len)}</div>
         <div class="dp">${g.dn}/${g.n}</div></div>`).join('')}
-      ${keys.length>12?`<div class="dmore">and ${keys.length-12} more</div>`:''}</div>`;
+      ${keys.length>12?`<div class="dmore">and ${keys.length-12} more</div>`:''}
+      <div class="dchips">
+        <span class="dchip" data-rstate="inv"><i style="background:var(--good)"></i>
+          Invoiced <b>${src.filter(isDone).length}</b></span>
+        <span class="dchip" data-rstate="none"><i style="background:var(--warn)"></i>
+          Still to invoice <b>${src.length-src.filter(isDone).length}</b></span></div></div>`;
   };
   return `<div class="dsec">
       <div class="dhead"><h3>Length invoiced</h3>
@@ -3557,6 +3547,11 @@ function invSections(states){
         <i style="width:${tot?(tot-got)/tot*100:0}%;background:var(--warn)"><b>${km(tot-got)}</b></i>
       </div>
       <div class="dnote">${km(got)} of ${km(tot)} — ${Math.round(tot?got/tot*100:0)}% of the network</div>
+      <div class="dchips">
+        <span class="dchip" data-rstate="inv"><i style="background:var(--good)"></i>
+          Invoiced <b>${done.length}</b></span>
+        <span class="dchip" data-rstate="none"><i style="background:var(--warn)"></i>
+          Still to invoice <b>${src.length-done.length}</b></span></div>
     </div>`
     + byGroup('diameter_mm','By diameter',k=>k==='(not set)'?k:('Ø'+k+' mm'))
     + byGroup('method','By method');
@@ -3621,75 +3616,6 @@ function hideTip(){ if(TIP)TIP.classList.remove('on'); }
 document.addEventListener('scroll',hideTip,true);
 
 /* every coloured segment on the dashboard gets it */
-
-/* ============================================================
-   The magnifier. A segment worth 1% of a bar is a few pixels wide and
-   almost impossible to hit, so clicking anywhere on a bar opens it as a
-   list: every colour in that bar, at a size you can actually press, with
-   its name, count and share. Picking one does what clicking the sliver
-   would have done.
-   ============================================================ */
-function openMagnifier(bar,ev){
-  const segs=[...bar.querySelectorAll('i')].filter(i=>i.offsetWidth!==0||i.style.width||i.style.flex);
-  if(segs.length<2)return false;
-  closeMagnifier();
-  const total=segs.reduce((t,i)=>t+(parseFloat(i.style.flex)||parseFloat(i.style.width)||0),0)||1;
-  const rows=segs.map((i,n)=>{
-    const label=(i.getAttribute('title')||'').trim();
-    const cut=label.lastIndexOf(' — ');
-    const name=cut>0?label.slice(0,cut):label||('part '+(n+1));
-    const count=cut>0?label.slice(cut+3):(i.textContent||'').trim();
-    const v=parseFloat(i.style.flex)||parseFloat(i.style.width)||0;
-    return {i,name,count,pct:Math.round(v/total*100),
-            col:i.style.background||i.style.backgroundColor};
-  });
-  const m=document.createElement('div');
-  m.className='mag';
-  m.innerHTML=`<div class="maghd">Pick a colour</div>`+rows.map((r,n)=>
-    `<button data-m="${n}"><i style="background:${r.col}"></i>
-       <span class="mn">${esc(r.name)}</span>
-       <span class="mc">${esc(r.count||'')}</span>
-       <span class="mp">${r.pct}%</span></button>`).join('');
-  document.body.appendChild(m);
-  const b=bar.getBoundingClientRect(), r=m.getBoundingClientRect();
-  m.style.left=Math.max(8,Math.min(innerWidth-r.width-8,b.left))+'px';
-  m.style.top=(b.bottom+r.height+8>innerHeight ? Math.max(8,b.top-r.height-8) : b.bottom+8)+'px';
-  requestAnimationFrame(()=>m.classList.add('on'));
-  m.querySelectorAll('[data-m]').forEach(btn=>btn.onclick=e=>{
-    e.stopPropagation();
-    const seg=rows[+btn.dataset.m].i;
-    closeMagnifier();
-    /* do what pressing the sliver would do, without going back through the
-       handler that opened this list */
-    if(seg.dataset.rstate){
-      RSTATE=(RSTATE===seg.dataset.rstate)?'':seg.dataset.rstate;
-      VIEW='reg'; paint();
-    } else { _magBypass=true; seg.click(); _magBypass=false; }
-  });
-  _mag=m;
-  setTimeout(()=>document.addEventListener('pointerdown',closeMagnifier,{once:true}),0);
-  return true;
-}
-let _mag=null, _magBypass=false;
-function closeMagnifier(){ if(_mag){ _mag.remove(); _mag=null; } }
-window.addEventListener('resize',closeMagnifier);
-document.addEventListener('keydown',e=>{ if(e.key==='Escape')closeMagnifier(); });
-
-/* every bar gets it; a wide segment still responds to a direct press */
-function wireMagnifiers(){
-  document.querySelectorAll('.dbar,.dtrack,.hbar').forEach(bar=>{
-    if(bar._mag)return; bar._mag=1;
-    bar.style.cursor='zoom-in';
-    bar.addEventListener('click',e=>{
-      if(_magBypass)return;
-      const seg=e.target.closest('i');
-      /* a comfortable target is used directly; a sliver opens the list */
-      if(seg&&seg.getBoundingClientRect().width>=22)return;
-      e.preventDefault(); e.stopPropagation();
-      openMagnifier(bar,e);
-    },true);
-  });
-}
 
 function wireChartTips(){
   document.querySelectorAll('.dbar i,.dtrack i,.hbar i,.kpi .bar i').forEach(seg=>{
@@ -3818,6 +3744,9 @@ function discSection(field,title,states){
         <div class="dn">${g.n}</div>
         <div class="dp">${Math.round(done/g.n*100)}%</div></div>`;}).join('')}
     ${keys.length>12?`<div class="dmore">and ${keys.length-12} more</div>`:''}
+    <div class="dchips">${states.filter(x=>x.n).map(x=>
+      `<span class="dchip" data-rstate="${esc(x.k)}"><i style="background:${x.c}"></i>
+        ${esc(x.t)} <b>${x.n}</b></span>`).join('')}</div>
   </div>`;
 }
 
@@ -3855,7 +3784,7 @@ function paint(){
   $('crumb').textContent   = onReg?'':VIEWLABEL[VIEW]||'';
   $('crumb').style.display = onReg?'none':'';
   if(onReg){ paintTabs(); paintKpis(); paintTools(); paintTable(); }
-  else if(VIEW==='dash'){ paintKpis(); paintOverview(); wireDash(); wireRegCards(); wireChartTips(); wireMagnifiers();
+  else if(VIEW==='dash'){ paintKpis(); paintOverview(); wireDash(); wireRegCards(); wireChartTips();
     document.querySelectorAll('.dtbl tr[data-open]').forEach(tr=>
       tr.onclick=()=>{ VIEW='reg'; paint(); openSheet(+tr.dataset.open); }); }
   else if(VIEW==='plan'){ paintPlan(); }
