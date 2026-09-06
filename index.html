@@ -496,6 +496,17 @@ table.g th .fmark{font-style:normal;font-size:9px;opacity:.85}
 #statusline{position:fixed;left:0;right:0;bottom:0;z-index:850}
 body.windowed #statusline{display:none!important}   /* the taskbar carries it instead */
 .wrap{padding-bottom:44px}
+
+/* the grid behaving like a spreadsheet */
+#gwrap{outline:none;overflow:auto;max-height:calc(100vh - 300px)}
+table.g td.selcell{background:var(--accent-soft)!important}
+table.g td.curcell{box-shadow:inset 0 0 0 2px var(--accent)}
+table.g td .cellin{width:100%;box-sizing:border-box;border:none;outline:none;
+  background:var(--field);color:var(--ink);font:inherit;padding:2px 4px}
+#gwrap.wrapcells table.g td{white-space:normal;word-break:break-word;vertical-align:top}
+table.g th{position:relative}
+table.g th .cgrip{position:absolute;right:0;top:0;bottom:0;width:6px;cursor:col-resize}
+table.g th .cgrip:hover{background:var(--accent)}
 </style>
 <script>
 (()=>{ let t=null; try{ t=localStorage.getItem('eng_theme'); }catch(e){}
@@ -549,7 +560,7 @@ body.windowed #statusline{display:none!important}   /* the taskbar carries it in
 <script>
 const SB_URL='https://ivmmnsjiekhjxkhllncb.supabase.co';
 const SB_KEY='sb_publishable_RTHsaxZXVmRBQziLbFJX8g_PAaZzIbF';
-const BUILD='ENG 2026-09-06 · e23';
+const BUILD='ENG 2026-09-06 · e24';
 
 let SESSION=null, ME=null;
 let PROJECTS=[], PEOPLE=[], AB=[], SD=[], GIS=[], HIST=[], INV=[];
@@ -1320,12 +1331,19 @@ function paintTools(){
     `<button class="btn" id="dates"${(DF.from||DF.to)?' style="border-color:var(--accent);color:var(--accent)"':''}>${
        (DF.from||DF.to)?esc((DATECOLS[TAB].find(c=>c[0]===DF.field)||['','Date'])[1]+' '+(DF.from||'…')+' → '+(DF.to||'…')):'Dates'}</button>
      <button class="btn" id="csv">Export CSV</button>
+     <button class="btn${WRAPCELLS?' on':''}" id="wrapb"
+        title="Let long text wrap onto several lines">Wrap text</button>
+     <button class="btn" id="filld" title="Copy the top cell down the selection — Ctrl+D">Fill down</button>
      <button class="btn" id="pdf">Print</button>
      ${anyFilter()?`<button class="btn" id="clrf" title="${esc(filterSummary())}"
         style="border-color:var(--accent);color:var(--accent)">✕ Clear filters</button>`:''}
      <span class="count" id="count"></span>`;
   $('q').oninput=e=>{Q=e.target.value;paintTable();};
   if($('clrf'))$('clrf').onclick=()=>clearAllFilters();
+  if($('wrapb'))$('wrapb').onclick=()=>{ WRAPCELLS=!WRAPCELLS;
+    try{ localStorage.setItem('eng_wrap',WRAPCELLS?'1':'0'); }catch(e){}
+    paint(); };
+  if($('filld'))$('filld').onclick=()=>fillDown();
   $('tools').querySelectorAll('[data-f]').forEach(b=>b.onclick=()=>{F=b.dataset.f;paint();});
   if($('cleardrill'))$('cleardrill').onclick=clearDrill;
   if($('newrec'))$('newrec').onclick=newRecord;
@@ -1724,6 +1742,231 @@ function openOverdueWindow(){
   win.view='late'; drawWin(win);
 }
 
+
+/* ============================================================
+   The grid as a spreadsheet: pick a cell, extend with shift or by
+   dragging, type to edit, copy and paste blocks straight to and from
+   Excel, fill down, resize a column, and wrap long text.
+   ============================================================ */
+let SEL=null;                 /* {r1,c1,r2,c2} in visible row/column order */
+let CUR={r:0,c:0};
+let GRIDROWS=[], GRIDCOLS=[];
+let WRAPCELLS=false;
+try{ WRAPCELLS=localStorage.getItem('eng_wrap')==='1'; }catch(e){}
+
+const selBox=()=>SEL?{r1:Math.min(SEL.r1,SEL.r2),r2:Math.max(SEL.r1,SEL.r2),
+                      c1:Math.min(SEL.c1,SEL.c2),c2:Math.max(SEL.c1,SEL.c2)}:null;
+function paintSel(){
+  const b=selBox();
+  document.querySelectorAll('table.g td[data-r]').forEach(td=>{
+    const r=+td.dataset.r, c=+td.dataset.c;
+    const on = b && r>=b.r1 && r<=b.r2 && c>=b.c1 && c<=b.c2;
+    td.classList.toggle('selcell',!!on);
+    td.classList.toggle('curcell', r===CUR.r && c===CUR.c);
+  });
+  const el=document.querySelector(`td[data-r="${CUR.r}"][data-c="${CUR.c}"]`);
+  if(el&&el.scrollIntoView)el.scrollIntoView({block:'nearest',inline:'nearest'});
+  const n=b?((b.r2-b.r1+1)*(b.c2-b.c1+1)):0;
+  const cnt=document.getElementById('count');
+  if(cnt&&n>1)cnt.dataset.sel=n+' cells';
+}
+/* which field a visible column writes to, and whether it may be written */
+function colEditable(c){
+  const map=(EDIT[TAB]||[]).reduce((m,f)=>(m[f[0]]=f,m),{});
+  const doc=EDIT._doc||{};
+  if(map[c.k])return map[c.k];
+  if(doc[c.k])return [c.k,c.t,doc[c.k]];
+  return null;
+}
+function cellValue(row,c){
+  const v=c.calc?c.calc(row):row[c.k];
+  return (v===null||v===undefined)?'':String(v);
+}
+/* ---- copy, paste, fill, clear ---- */
+function selText(){
+  const b=selBox(); if(!b)return '';
+  const out=[];
+  for(let r=b.r1;r<=b.r2;r++){
+    const row=GRIDROWS[r]; if(!row)continue;
+    const line=[];
+    for(let c=b.c1;c<=b.c2;c++){
+      const col=GRIDCOLS[c]; if(!col)continue;
+      line.push(cellValue(row,col).replace(/\t/g,' ').replace(/\r?\n/g,' '));
+    }
+    out.push(line.join('\t'));
+  }
+  return out.join('\n');
+}
+async function copySel(){
+  const t=selText(); if(!t)return;
+  try{ await navigator.clipboard.writeText(t); }
+  catch(e){ const ta=document.createElement('textarea'); ta.value=t;
+    document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); }
+  const b=selBox();
+  toast('Copied '+((b.r2-b.r1+1)*(b.c2-b.c1+1))+' cells');
+}
+/* Excel puts a block on the clipboard as tab-separated lines */
+async function pasteInto(text){
+  if(!canEdit())return toast('You have read-only access');
+  const b=selBox()||{r1:CUR.r,c1:CUR.c,r2:CUR.r,c2:CUR.c};
+  const lines=String(text).replace(/\r/g,'').replace(/\n$/,'').split('\n').map(l=>l.split('\t'));
+  const jobs=[];
+  lines.forEach((cells,dr)=>cells.forEach((val,dc)=>{
+    const row=GRIDROWS[b.r1+dr], col=GRIDCOLS[b.c1+dc];
+    if(!row||!col)return;
+    const f=colEditable(col); if(!f)return;
+    jobs.push({row,col,f,val:val.trim()});
+  }));
+  if(!jobs.length)return toast('Nothing here can be pasted into');
+  await applyEdits(jobs, 'Pasted');
+}
+async function fillDown(){
+  if(!canEdit())return toast('You have read-only access');
+  const b=selBox(); if(!b||b.r2===b.r1)return toast('Select the cell and the rows below it');
+  const jobs=[];
+  for(let c=b.c1;c<=b.c2;c++){
+    const col=GRIDCOLS[c], f=col&&colEditable(col); if(!f)continue;
+    const src=cellValue(GRIDROWS[b.r1],col);
+    for(let r=b.r1+1;r<=b.r2;r++){
+      const row=GRIDROWS[r]; if(!row)continue;
+      jobs.push({row,col,f,val:src});
+    }
+  }
+  if(!jobs.length)return toast('These columns cannot be edited');
+  await applyEdits(jobs,'Filled down');
+}
+async function clearSel(){
+  if(!canEdit())return toast('You have read-only access');
+  const b=selBox(); if(!b)return;
+  const jobs=[];
+  for(let r=b.r1;r<=b.r2;r++)for(let c=b.c1;c<=b.c2;c++){
+    const row=GRIDROWS[r], col=GRIDCOLS[c];
+    const f=row&&col&&colEditable(col); if(!f)continue;
+    jobs.push({row,col,f,val:''});
+  }
+  if(jobs.length)await applyEdits(jobs,'Cleared');
+}
+/* one place that writes, so paste, fill, clear and typing all behave alike */
+async function applyEdits(jobs,what){
+  /* jobs is filtered below, so it must not be a const */
+  const undo=[];
+  const byRow=new Map();
+  const skipped=[];
+  const asDate=v=>{
+    const m=String(v).match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if(m)return m[0];
+    const d=String(v).match(/^(\d{1,2})[\/-](\d{1,2})[\/-](\d{4})$/);
+    if(d)return d[3]+'-'+d[2].padStart(2,'0')+'-'+d[1].padStart(2,'0');
+    return null;
+  };
+  jobs=jobs.filter(j=>{
+    const kind=j.f[2], v=j.val;
+    if(kind==='num' && v!=='' && isNaN(+v)){ skipped.push(j.col.t+' takes a number'); return false; }
+    if(kind==='date'&& v!=='' && !asDate(v)){ skipped.push(j.col.t+' takes a date'); return false; }
+    if(kind==='sel' && v!=='' && !(j.f[3]||[]).some(a=>String(a).toLowerCase()===v.toLowerCase())){
+      skipped.push(j.col.t+' only takes its listed values'); return false; }
+    return true;
+  });
+  if(!jobs.length){ toast(skipped.length?('Nothing written — '+skipped[0])
+    :'Nothing here can be written to'); return; }
+  jobs.forEach(j=>{
+    let v=j.val;
+    const kind=j.f[2];
+    if(kind==='num')v = v===''?null:+v;
+    if(kind==='sel'&&v!==''){
+      const allowed=j.f[3]||[];
+      const hit=allowed.find(a=>String(a).toLowerCase()===v.toLowerCase());
+      if(hit)v=hit;
+    }
+    if(kind==='date'&&v!=='')v=asDate(v)||v;
+    undo.push({row:j.row,k:j.col.k,before:j.row[j.col.k]});
+    j.row[j.col.k]=v;
+    if(!byRow.has(j.row.id))byRow.set(j.row.id,{row:j.row,patch:{}});
+    byRow.get(j.row.id).patch[j.col.k]=v;
+  });
+  paintTable();
+  let ok=0, bad=0;
+  for(const {row,patch} of byRow.values()){
+    try{ await api(TABLE[TAB]+'?id=eq.'+row.id,{method:'PATCH',body:JSON.stringify(patch)}); ok++; }
+    catch(e){ bad++; }
+  }
+  if(bad){ undo.forEach(u=>u.row[u.k]=u.before); paintTable();
+    toast('Could not save — nothing was changed'); }
+  else { toast(what+' · '+jobs.length+' cell'+(jobs.length>1?'s':'')+' in '+ok+' record'+(ok>1?'s':'')+
+    (skipped.length?(' · '+skipped.length+' skipped — '+skipped[0]):'')); }
+  paintKpis&&paintKpis();
+}
+/* ---- editing one cell in place ---- */
+function beginCellEdit(r,c,seed){
+  const row=GRIDROWS[r], col=GRIDCOLS[c]; if(!row||!col)return;
+  const f=colEditable(col);
+  if(!f)return toast('This column is worked out, not typed');
+  if(!canEdit())return toast('You have read-only access');
+  const td=document.querySelector(`td[data-r="${r}"][data-c="${c}"]`); if(!td)return;
+  const kind=f[2], cur=cellValue(row,col);
+  let el;
+  if(kind==='sel'){
+    el=document.createElement('select');
+    el.innerHTML=(f[3]||[]).map(o=>`<option${String(o)===cur?' selected':''}>${esc(o)}</option>`).join('');
+  }else{
+    el=document.createElement('input');
+    el.type = kind==='date'?'date' : kind==='num'?'number' : 'text';
+    el.value = seed!==undefined?seed:cur;
+  }
+  el.className='cellin';
+  td.innerHTML=''; td.appendChild(el); el.focus();
+  if(el.select&&seed===undefined)el.select();
+  let done=false;
+  const finish=async commit=>{
+    if(done)return; done=true;
+    const v=el.value;
+    if(commit && v!==cur) await applyEdits([{row,col,f,val:v}],'Saved');
+    else paintTable();
+    const w=document.getElementById('gwrap'); if(w)w.focus();
+  };
+  el.addEventListener('blur',()=>finish(true));
+  el.addEventListener('keydown',ev=>{
+    ev.stopPropagation();
+    if(ev.key==='Enter'){ev.preventDefault();finish(true).then(()=>{
+      CUR={r:Math.min(r+1,GRIDROWS.length-1),c};SEL={r1:CUR.r,c1:c,r2:CUR.r,c2:c};paintSel();});}
+    else if(ev.key==='Escape'){ev.preventDefault();finish(false);}
+    else if(ev.key==='Tab'){ev.preventDefault();finish(true).then(()=>{
+      CUR={r,c:Math.min(c+1,GRIDCOLS.length-1)};SEL={r1:r,c1:CUR.c,r2:r,c2:CUR.c};paintSel();});}
+  });
+}
+/* ---- the keyboard ---- */
+function gridKey(e){
+  if(!GRIDROWS.length)return;
+  const t=e.target;
+  if(t&&(t.tagName==='INPUT'||t.tagName==='SELECT'||t.tagName==='TEXTAREA')&&!t.classList.contains('cellin'))return;
+  const maxR=GRIDROWS.length-1, maxC=GRIDCOLS.length-1, k=e.key;
+  const mv=(dr,dc,ext)=>{
+    const r=Math.max(0,Math.min(maxR,CUR.r+dr)), c=Math.max(0,Math.min(maxC,CUR.c+dc));
+    CUR={r,c};
+    SEL = ext&&SEL ? {...SEL,r2:r,c2:c} : {r1:r,c1:c,r2:r,c2:c};
+    paintSel();
+  };
+  if(k==='ArrowDown'){e.preventDefault();mv(1,0,e.shiftKey);}
+  else if(k==='ArrowUp'){e.preventDefault();mv(-1,0,e.shiftKey);}
+  else if(k==='ArrowLeft'){e.preventDefault();mv(0,-1,e.shiftKey);}
+  else if(k==='ArrowRight'||k==='Tab'){e.preventDefault();mv(0,1,e.shiftKey&&k!=='Tab');}
+  else if(k==='Enter'){e.preventDefault();beginCellEdit(CUR.r,CUR.c);}
+  else if(k==='Delete'||k==='Backspace'){e.preventDefault();clearSel();}
+  else if((e.ctrlKey||e.metaKey)&&k.toLowerCase()==='c'){e.preventDefault();copySel();}
+  else if((e.ctrlKey||e.metaKey)&&k.toLowerCase()==='d'){e.preventDefault();fillDown();}
+  else if((e.ctrlKey||e.metaKey)&&k.toLowerCase()==='a'){e.preventDefault();
+    SEL={r1:0,c1:0,r2:maxR,c2:maxC};CUR={r:0,c:0};paintSel();}
+  else if(k.length===1&&!e.ctrlKey&&!e.metaKey&&!e.altKey){
+    e.preventDefault(); beginCellEdit(CUR.r,CUR.c,k);
+  }
+}
+document.addEventListener('paste',e=>{
+  const w=document.getElementById('gwrap');
+  if(!w||!w.contains(document.activeElement)&&document.activeElement!==w)return;
+  const t=(e.clipboardData||window.clipboardData).getData('text');
+  if(t){ e.preventDefault(); pasteInto(t); }
+});
+
 function paintTable(){
 
   const cols=COLS[TAB], rows=rowsNow();
@@ -1742,20 +1985,25 @@ function paintTable(){
   const fz=Math.min(COLPREF.freeze||0,vcols.length);
   const fcls=i=>i<fz?(' frz'+(i===fz-1?' frzlast':'')):'';
   const fsty=i=>i<fz?`left:${frozenLeft(vcols,i)}px;`:'';
-  $wrap().innerHTML=`<table class="g"><thead><tr>${vcols.map((c,ci)=>
+  GRIDROWS=rows; GRIDCOLS=vcols;
+  if(CUR.r>rows.length-1)CUR={r:0,c:0};
+  $wrap().innerHTML=`<div id="gwrap" tabindex="0" class="${WRAPCELLS?'wrapcells':''}">
+    <table class="g"><thead><tr>${vcols.map((c,ci)=>
       `<th data-k="${c.k}" class="${(fcls(ci)+((CFILT[c.k]&&CFILT[c.k].length)?' filtered':'')).trim()}"
         style="${fsty(ci)}width:${COLPREF.w[c.k]||c.w}px"
-        title="Right-click, or shift-click, for column options">${c.t}${
+        title="Right-click, or shift-click, for column options"><span class="cgrip" data-g="${c.k}"></span>${c.t}${
         (CFILT[c.k]&&CFILT[c.k].length)?' <i class="fmark">▼</i>':''}${
         SORT.k===c.k?(SORT.dir>0?' ▲':' ▼'):''}</th>`).join('')}</tr></thead>
-    <tbody>${rows.map((r,i)=>`<tr data-id="${r.id}" style="cursor:pointer;animation-delay:${Math.min(i,16)*22}ms">${
+    <tbody>${rows.map((r,ri)=>`<tr data-id="${r.id}" data-row="${ri}" style="animation-delay:${Math.min(ri,16)*22}ms">${
       vcols.map((c,ci)=>{
         const v=c.calc?c.calc(r):r[c.k];
         const txt=(v===null||v===undefined||v==='')?'':String(v);
-        return `<td class="${c.cls||''} ${c.wrap?'wrapc':''}${fcls(ci)}" style="${fsty(ci)}">${
-          c.pill?pill(txt):esc(txt)}</td>`;}).join('')}</tr>`).join('')}
-    </tbody></table>`;
-  $wrap().querySelectorAll('tbody tr[data-id]').forEach(tr=>tr.onclick=()=>openSheet(+tr.dataset.id));
+        return `<td data-r="${ri}" data-c="${ci}" class="${c.cls||''} ${c.wrap?'wrapc':''}${fcls(ci)}"
+          style="${fsty(ci)}">${c.pill?pill(txt):esc(txt)}</td>`;}).join('')}</tr>`).join('')}
+    </tbody></table></div>`;
+  $wrap().querySelectorAll('tbody tr[data-id]').forEach(tr=>
+    tr.ondblclick=e=>{ if(!e.target.closest('td[data-r]'))openSheet(+tr.dataset.id); });
+  wireCells(); wireColResize();
   $wrap().querySelectorAll('th[data-k]').forEach(th=>{
     th.oncontextmenu=e=>colMenu(e,th.dataset.k,vcols);
     th.onclick=e=>{
@@ -1855,6 +2103,60 @@ function regCards(tab){
       every record is in exactly one of these states${
         sum===total&&psum===100?'':' <span class="bad">(does not close)</span>'}</div></div>`;
 }
+
+/* pick a cell, drag to take a block, double-click to edit it */
+
+/* drag the edge of a heading to set its width; double-click to fit */
+function wireColResize(){
+  document.querySelectorAll('table.g th .cgrip').forEach(g=>{
+    const k=g.dataset.g;
+    g.addEventListener('pointerdown',e=>{
+      e.preventDefault(); e.stopPropagation();
+      const th=g.closest('th'), x0=e.clientX, w0=th.getBoundingClientRect().width;
+      const move=ev=>{
+        const w=Math.max(56,Math.round(w0+(ev.clientX-x0)));
+        COLPREF.w[k]=w; th.style.width=w+'px';
+        th.style.minWidth=w+'px'; th.style.maxWidth=w+'px';
+      };
+      const up=()=>{ document.removeEventListener('pointermove',move);
+        saveColPref(); paintTable(); };
+      document.addEventListener('pointermove',move);
+      document.addEventListener('pointerup',up,{once:true});
+    });
+    g.addEventListener('dblclick',e=>{
+      e.preventDefault(); e.stopPropagation();
+      const col=GRIDCOLS.find(c=>c.k===k); if(!col)return;
+      let max=String(col.t).length;
+      GRIDROWS.forEach(r=>{ max=Math.max(max, cellValue(r,col).length); });
+      COLPREF.w[k]=Math.max(60,Math.min(460, 14+max*7.2));
+      saveColPref(); paintTable();
+    });
+  });
+}
+
+function wireCells(){
+  const w=document.getElementById('gwrap'); if(!w)return;
+  let dragging=false;
+  w.querySelectorAll('td[data-r]').forEach(td=>{
+    const r=+td.dataset.r, c=+td.dataset.c;
+    td.addEventListener('pointerdown',e=>{
+      if(e.button!==0)return;
+      w.focus();
+      if(e.shiftKey&&SEL){ SEL={...SEL,r2:r,c2:c}; CUR={r,c}; }
+      else { CUR={r,c}; SEL={r1:r,c1:c,r2:r,c2:c}; dragging=true; }
+      paintSel();
+    });
+    td.addEventListener('pointerenter',()=>{
+      if(!dragging)return;
+      SEL={...SEL,r2:r,c2:c}; CUR={r,c}; paintSel();
+    });
+    td.addEventListener('dblclick',e=>{ e.stopPropagation(); beginCellEdit(r,c); });
+  });
+  document.addEventListener('pointerup',()=>{dragging=false;},{once:true});
+  w.onkeydown=gridKey;
+  paintSel();
+}
+
 function wireRegCards(){
   document.querySelectorAll('[data-rstate]').forEach(el=>{
     el.style.cursor='pointer';
