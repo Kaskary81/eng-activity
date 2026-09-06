@@ -746,7 +746,7 @@ table.g tbody tr:hover .openb{color:var(--ink2)}
 <script>
 const SB_URL='https://ivmmnsjiekhjxkhllncb.supabase.co';
 const SB_KEY='sb_publishable_RTHsaxZXVmRBQziLbFJX8g_PAaZzIbF';
-const BUILD='ENG 2026-09-06 · e46';
+const BUILD='ENG 2026-09-06 · e47';
 
 let SESSION=null, ME=null;
 let PROJECTS=[], PEOPLE=[], AB=[], SD=[], GIS=[], HIST=[], INV=[];
@@ -1106,6 +1106,9 @@ function openSheet(id){
                  :'<span class="who">read only</span>'}</div>
     <div class="sb">${fields.map(([k,label,type,opts])=>{
       const v=row[k]??'';
+      /* say whose scheme this is, so it is obvious which list you are getting */
+      if(k==='review_status'&&projectClient(row.project_id)==='Maaden')
+        label=label+" · Ma'aden";
       const dis=canEdit()?'':' disabled';
       const input =
         type==='area' ? `<textarea id="f-${k}"${dis}>${esc(v)}</textarea>`
@@ -2482,14 +2485,20 @@ function wireCombos(scope){
 
 /* the choices for a select field, worked out NOW rather than when the file
    loaded — the review list depends on which client the project answers to */
+/* Which client a project answers to. The column says so, but the code and
+   name are checked too, so this still works if that column is ever missing. */
+function projectClient(pid){
+  const p=(PROJECTS||[]).find(x=>String(x.id)===String(pid));
+  if(!p)return null;
+  if(p.client)return p.client;
+  return /rum|rjum|maaden|ma'aden/i.test((p.code||'')+' '+(p.name||'')) ? 'Maaden' : 'NWC';
+}
 function liveOptions(key,fallback,row){
   if(key==='review_status'||(key==='status'&&TAB==='gis')){
-    const pid = row&&row.project_id!=null ? row.project_id : PROJ;
-    if(pid!=null){
-      const p=(PROJECTS||[]).find(x=>String(x.id)===String(pid));
-      return (p&&p.client==='Maaden') ? REVIEW_MAADEN : REVIEW_NWC;
-    }
-    /* nothing to go on — offer both rather than hide anything */
+    const pid = (row&&row.project_id!=null) ? row.project_id : PROJ;
+    const c = pid!=null ? projectClient(pid) : null;
+    if(c)return c==='Maaden' ? REVIEW_MAADEN : REVIEW_NWC;
+    /* looking across projects with no record in hand — offer both */
     return [...new Set([...REVIEW_NWC,...REVIEW_MAADEN])];
   }
   return fallback||[];
