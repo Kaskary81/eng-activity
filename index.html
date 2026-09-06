@@ -946,7 +946,7 @@ table.g tbody tr:hover .openb{color:var(--ink2)}
 <script>
 const SB_URL='https://ivmmnsjiekhjxkhllncb.supabase.co';
 const SB_KEY='sb_publishable_RTHsaxZXVmRBQziLbFJX8g_PAaZzIbF';
-const BUILD='ENG 2026-09-06 · e65';
+const BUILD='ENG 2026-09-06 · e66';
 
 let SESSION=null, ME=null;
 let PROJECTS=[], PEOPLE=[], AB=[], SD=[], GIS=[], HIST=[], INV=[];
@@ -2919,7 +2919,8 @@ function clearShards(){
   cancelAnimationFrame(raf);
   stage.classList.add('gone');
   setTimeout(()=>stage.remove(),260);
-  if(card){ card.classList.remove('cracked'); card.classList.add('remade');
+  if(card){ card.classList.remove('cracked'); card.style.visibility='';
+    card.classList.add('remade');
     setTimeout(()=>card.classList.remove('remade'),280); }
   SHARDS=null;
 }
@@ -2954,7 +2955,10 @@ function shatter(el,then){
     const d=document.createElement('div');
     d.className='shard';
     d.style.cssText=`left:${r.left}px;top:${r.top}px;width:${r.width}px;height:${r.height}px;`+
-      `background:${cs.backgroundColor};border-radius:${cs.borderRadius};padding:${cs.padding};`;
+      `background:${cs.backgroundColor};border-radius:${cs.borderRadius};padding:${cs.padding};`+
+      `border:${cs.border};box-shadow:${cs.boxShadow};`+
+      `font:${cs.font};color:${cs.color};text-align:${cs.textAlign};`+
+      `letter-spacing:${cs.letterSpacing};line-height:${cs.lineHeight};`;
     d.style.clipPath=`polygon(${cx}% ${cy}%, ${p1[0]}% ${p1[1]}%, ${p2[0]}% ${p2[1]}%)`;
     d.innerHTML=el.innerHTML;
     stage.appendChild(d);
@@ -3011,6 +3015,7 @@ function shatter(el,then){
     if(moving)SHARDS.raf=requestAnimationFrame(step);
   };
   el.classList.add('cracked');
+  el.style.visibility='hidden';          /* the whole card goes, not just a layer */
   if(navigator.vibrate)navigator.vibrate([9,28,14]);
   SHARDS={stage,card:el,raf:requestAnimationFrame(step)};
   /* they stay put; the next press anywhere puts the card back together */
