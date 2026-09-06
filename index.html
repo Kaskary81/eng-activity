@@ -553,6 +553,45 @@ table.g tbody tr:hover .openb{color:var(--ink2)}
 .fitem .ft{color:var(--ink);font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .fitem .fm{color:var(--ink3);font-size:11px;margin-top:2px;display:flex;gap:6px}
 .fitem .fw{margin-left:auto;white-space:nowrap}
+
+/* the dashboard's opening panel */
+.panel.hero{display:flex;gap:26px;align-items:center;flex-wrap:wrap;
+  background:linear-gradient(135deg,var(--surface2),var(--surface));
+  border:1px solid var(--ring);border-radius:18px;padding:20px 22px;margin-bottom:14px}
+.heroL{flex:none}
+.heroR{flex:1;min-width:260px}
+.ring{position:relative;width:150px;height:150px;display:grid;place-items:center}
+.ring svg{width:150px;height:150px;transform:rotate(-90deg)}
+.ring .rbg{fill:none;stroke:var(--chip);stroke-width:11}
+.ring .rfg{fill:none;stroke-width:11;stroke-linecap:round;
+  transition:stroke-dashoffset .8s var(--ease)}
+.ring .rmid{position:absolute;text-align:center;line-height:1.1}
+.ring .rmid b{display:block;font-size:30px;font-weight:680;color:var(--ink)}
+.ring .rmid b small{font-size:14px;font-weight:600;color:var(--ink3);margin-left:1px}
+.ring .rmid span{font-size:10.5px;text-transform:uppercase;letter-spacing:.07em;color:var(--ink3)}
+.ring .rsub2{position:absolute;bottom:-2px;font-size:11px;color:var(--ink3)}
+.hhead{display:flex;align-items:baseline;gap:10px;margin-bottom:12px}
+.hhead h3{margin:0;font-size:16px;color:var(--ink)}
+.hhead .hsub{font-size:11.5px;color:var(--ink3)}
+.hstats{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px}
+.hstat{background:var(--surface);border:1px solid var(--ring);border-radius:12px;
+  padding:10px 12px;cursor:pointer;transition:border-color .15s,transform .15s}
+.hstat:hover{border-color:var(--accent);transform:translateY(-1px)}
+.hstat .hn{display:block;font-size:22px;font-weight:680;line-height:1}
+.hstat .hk{display:block;font-size:10.5px;text-transform:uppercase;letter-spacing:.06em;
+  color:var(--ink3);margin-top:4px}
+.hstat .hp{font-size:11px;color:var(--ink2)}
+.hbar{display:flex;height:10px;border-radius:6px;overflow:hidden;background:var(--chip);margin-top:14px}
+.hbar i{cursor:pointer}
+.hfoot{display:flex;gap:18px;margin-top:12px;font-size:11.5px;color:var(--ink3);flex-wrap:wrap}
+.hfoot b{color:var(--ink);font-size:13px;margin-right:3px}
+.hfoot .bad b{color:var(--critical)}
+/* the bar panels, rounded like the reference */
+.panel{background:var(--surface);border:1px solid var(--ring);border-radius:16px;padding:16px 18px}
+.btrack{border-radius:7px;overflow:hidden;height:13px}
+.btrack i{transition:flex .4s var(--ease)}
+.brow{align-items:center}
+.panels{display:grid;grid-template-columns:repeat(auto-fit,minmax(330px,1fr));gap:14px}
 </style>
 <script>
 (()=>{ let t=null; try{ t=localStorage.getItem('eng_theme'); }catch(e){}
@@ -607,7 +646,7 @@ table.g tbody tr:hover .openb{color:var(--ink2)}
 <script>
 const SB_URL='https://ivmmnsjiekhjxkhllncb.supabase.co';
 const SB_KEY='sb_publishable_RTHsaxZXVmRBQziLbFJX8g_PAaZzIbF';
-const BUILD='ENG 2026-09-06 · e35';
+const BUILD='ENG 2026-09-06 · e36';
 
 let SESSION=null, ME=null;
 let PROJECTS=[], PEOPLE=[], AB=[], SD=[], GIS=[], HIST=[], INV=[];
@@ -2446,6 +2485,59 @@ function paintTable(){
       SORT = SORT.k===k ? {k,dir:-SORT.dir} : {k,dir:1};
       paintTable();};});
 }
+
+/* ============================================================
+   The dashboard's opening panel: a ring showing how far the register
+   has got, the figures beside it, and the week's movement. Everything
+   here is clickable and lands in the register.
+   ============================================================ */
+function donut(pct,label,sub,colour){
+  const R=52, C=2*Math.PI*R, on=Math.max(0,Math.min(100,pct));
+  return `<div class="ring">
+    <svg viewBox="0 0 130 130">
+      <circle cx="65" cy="65" r="${R}" class="rbg"></circle>
+      <circle cx="65" cy="65" r="${R}" class="rfg"
+        style="stroke:${colour||'var(--accent)'};stroke-dasharray:${C};
+               stroke-dashoffset:${C-(C*on/100)}"></circle>
+    </svg>
+    <div class="rmid"><b>${Math.round(on)}<small>%</small></b><span>${esc(label)}</span></div>
+    ${sub?`<div class="rsub2">${esc(sub)}</div>`:''}</div>`;
+}
+function heroPanel(){
+  const {rows,total}=regSplit(TAB);
+  const label=(TABS.find(t=>t.k===TAB)||{}).t||'';
+  const doneRow=rows[0]||{n:0,p:0};
+  const week=(()=>{ /* what moved in the last seven days */
+    const cut=new Date(Date.now()-7*864e5).toISOString().slice(0,10);
+    const src=rowsOf(TAB);
+    return {out:src.filter(r=>(r.submitted_date||'')>=cut).length,
+            back:src.filter(r=>(r.received_date||'')>=cut).length};
+  })();
+  const late=(typeof overdueRows==='function')?overdueRows().length:0;
+  return `<div class="panel hero">
+    <div class="heroL">
+      ${donut(doneRow.p,doneRow.t||'done',doneRow.n+' of '+total,'var(--good)')}
+    </div>
+    <div class="heroR">
+      <div class="hhead"><h3>${esc(label)}</h3>
+        <span class="hsub">${PROJ?esc(projName(PROJ)):'all projects'} · ${total} record${total===1?'':'s'}</span></div>
+      <div class="hstats">
+        ${rows.map(x=>`<div class="hstat" data-rstate="${esc(x.k)}">
+            <span class="hn" style="color:${x.c}">${x.n}</span>
+            <span class="hk">${esc(x.t)}</span>
+            <span class="hp">${x.p}%</span></div>`).join('')}
+      </div>
+      <div class="hbar">${rows.filter(x=>x.n).map(x=>
+        `<i data-rstate="${esc(x.k)}" title="${esc(x.t)} — ${x.n}"
+            style="width:${x.n/(total||1)*100}%;background:${x.c}"></i>`).join('')}</div>
+      <div class="hfoot">
+        <span><b>${week.out}</b> submitted this week</span>
+        <span><b>${week.back}</b> came back</span>
+        <span class="${late?'bad':''}"><b>${late}</b> overdue</span>
+      </div>
+    </div></div>`;
+}
+
 function bars(title,groups,colFor,drill){
   const max=Math.max(1,...groups.map(g=>g.total));
   if(!groups.length)return `<div class="panel"><h3>${title}</h3>
@@ -2853,7 +2945,7 @@ function wireRegCards(){
 function paintOverview(){
   /* drawn below, then wired */
   const ab=abFor(), gi=gisFor();
-  $wrap().innerHTML=`${regCards(TAB)}<div class="panels">
+  $wrap().innerHTML=`${heroPanel()}<div class="panels">
     ${bars('As-builts by project', group(ab,r=>projName(r.project_id),r=>AB_DONE(r.status),
         r=>r.project_id),'var(--hot)',{tab:'asbuilts',field:'project_id'})}
     ${bars('As-builts by discipline', group(ab,r=>r.discipline,r=>AB_DONE(r.status)),
