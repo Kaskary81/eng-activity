@@ -430,6 +430,24 @@ table.g th.frzlast,table.g td.frzlast{border-right:2px solid var(--accent)}
   #printroot .rtbl thead{display:table-header-group}
   #printroot .rtbl tr{break-inside:avoid}
 }
+
+/* the card set, as in the LOD tracker */
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:14px}
+.kpi{background:var(--surface2);border:1px solid var(--ring);border-radius:12px;padding:11px 13px}
+.kpi .k{font-size:10px;letter-spacing:.07em;text-transform:uppercase;color:var(--ink3)}
+.kpi .v{font-size:27px;font-weight:660;letter-spacing:-.02em;margin-top:3px;line-height:1;color:var(--ink)}
+.kpi .v small{font-size:12px;font-weight:600;opacity:.62;margin-left:6px}
+.kpi .p{font-size:11px;color:var(--ink2);margin-top:3px}
+.kpi .bar{height:4px;border-radius:3px;background:var(--surface);margin-top:8px;overflow:hidden}
+.kpi .bar i{display:block;height:100%}
+.regkpi{cursor:pointer;transition:border-color .15s,transform .15s}
+.regkpi:hover{border-color:var(--accent);transform:translateY(-1px)}
+.ballbar{display:flex;height:34px;border-radius:8px;overflow:hidden;background:var(--surface2)}
+.ballbar i{display:flex;align-items:center;justify-content:center;min-width:2px;cursor:pointer}
+.ballbar i b{color:#fff;font-family:var(--mono);font-size:12px;font-weight:700}
+.regbar100{margin-top:12px}
+.legtot{margin-top:9px;font-size:12.5px;color:var(--ink3)}
+.legtot .bad{color:var(--critical)}
 </style>
 <script>
 (()=>{ let t=null; try{ t=localStorage.getItem('eng_theme'); }catch(e){}
@@ -478,7 +496,7 @@ table.g th.frzlast,table.g td.frzlast{border-right:2px solid var(--accent)}
 <script>
 const SB_URL='https://ivmmnsjiekhjxkhllncb.supabase.co';
 const SB_KEY='sb_publishable_RTHsaxZXVmRBQziLbFJX8g_PAaZzIbF';
-const BUILD='ENG 2026-08-31 · e16';
+const BUILD='ENG 2026-08-31 · e17';
 
 let SESSION=null, ME=null;
 let PROJECTS=[], PEOPLE=[], AB=[], SD=[], GIS=[], HIST=[], INV=[];
@@ -642,6 +660,14 @@ const COLS={
   ],
 };
 function rowsNow(){
+  /* a card on the dashboard filters the register to that state */
+  if(RSTATE){
+    const sp=regSplit(TAB).rows.find(x=>x.k===RSTATE);
+    if(sp){ const base=rowsOf(TAB), seen=new Set();
+      const order=regSplit(TAB).rows;
+      return base.filter(r=>{ for(const x of order){ if(!seen.has(r.id)&&x.f(r)){ seen.add(r.id);
+        return x.k===RSTATE; } } return false; }); }
+  }
   let rows = TAB==='gis'?gisFor()
            : TAB==='shop'?sdFor() : TAB==='invoice'?invFor() : abFor();
   if(F==='open'){
@@ -964,6 +990,7 @@ async function reloadRecord(kind,id){
    bottom of the phone.
    ============================================================ */
 let VIEW='reg';
+let RSTATE='';
 const ICON={
   dash:'<path d="M3 12h4l3-8 4 16 3-8h4"/>',
   reg :'<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 9v12"/>',
@@ -1330,16 +1357,16 @@ function paintTable(){
             :'Try a different search or filter.'}</div>`;
     return;
   }
-  cols=shownCols(cols);
-  const fz=Math.min(COLPREF.freeze||0,cols.length);
+  const vcols=shownCols(cols);          /* cols is a const — work on a copy */
+  const fz=Math.min(COLPREF.freeze||0,vcols.length);
   const fcls=i=>i<fz?(' frz'+(i===fz-1?' frzlast':'')):'';
-  const fsty=i=>i<fz?`left:${frozenLeft(cols,i)}px;`:'';
-  $('wrap').innerHTML=`<table class="g"><thead><tr>${cols.map((c,ci)=>
+  const fsty=i=>i<fz?`left:${frozenLeft(vcols,i)}px;`:'';
+  $('wrap').innerHTML=`<table class="g"><thead><tr>${vcols.map((c,ci)=>
       `<th data-k="${c.k}" class="${fcls(ci).trim()}" style="${fsty(ci)}width:${COLPREF.w[c.k]||c.w}px"
         title="Right-click, or shift-click, for column options">${c.t}${
         SORT.k===c.k?(SORT.dir>0?' ▲':' ▼'):''}</th>`).join('')}</tr></thead>
     <tbody>${rows.map((r,i)=>`<tr data-id="${r.id}" style="cursor:pointer;animation-delay:${Math.min(i,16)*22}ms">${
-      cols.map((c,ci)=>{
+      vcols.map((c,ci)=>{
         const v=c.calc?c.calc(r):r[c.k];
         const txt=(v===null||v===undefined||v==='')?'':String(v);
         return `<td class="${c.cls||''} ${c.wrap?'wrapc':''}${fcls(ci)}" style="${fsty(ci)}">${
@@ -1347,9 +1374,9 @@ function paintTable(){
     </tbody></table>`;
   $('wrap').querySelectorAll('tbody tr[data-id]').forEach(tr=>tr.onclick=()=>openSheet(+tr.dataset.id));
   $('wrap').querySelectorAll('th[data-k]').forEach(th=>{
-    th.oncontextmenu=e=>colMenu(e,th.dataset.k,cols);
+    th.oncontextmenu=e=>colMenu(e,th.dataset.k,vcols);
     th.onclick=e=>{
-      if(e.shiftKey){ colMenu(e,th.dataset.k,cols); return; }
+      if(e.shiftKey){ colMenu(e,th.dataset.k,vcols); return; }
       const k=th.dataset.k;
       SORT = SORT.k===k ? {k,dir:-SORT.dir} : {k,dir:1};
       paintTable();};});
@@ -1381,10 +1408,82 @@ function group(rows,keyFn,doneFn,rawFn){
     m[k].total++;if(doneFn(r))m[k].done++;});
   return Object.values(m).sort((a,b)=>(b.total-b.done)-(a.total-a.done)||b.total-a.total);
 }
+
+/* ============================================================
+   The LOD tracker's card set: every record in the register sits in
+   exactly one state, the cards add to the total and the bar beneath
+   adds to 100%. Clicking a card filters the register to that state.
+   ============================================================ */
+function regSplit(tab){
+  const rows=rowsOf(tab);
+  const st=[];
+  if(tab==='asbuilts'||tab==='gis'){
+    const done=r=>tab==='asbuilts'?AB_DONE(r.status):GIS_OK(r.review_status);
+    st.push({k:'done', t:'Approved',      c:'var(--good)',  s:'signed off, nothing outstanding',
+             f:r=>done(r)});
+    st.push({k:'sent', t:'Awaiting reply',c:'var(--warn)',  s:'submitted, no answer yet',
+             f:r=>!done(r)&&r.submitted_date});
+    st.push({k:'none', t:'Not submitted', c:'var(--ink3)',  s:'no submission at all',
+             f:r=>!done(r)&&!r.submitted_date});
+  } else if(tab==='shop'){
+    st.push({k:'ok',   t:'Approved',      c:'var(--good)',  s:'approved by the reviewer',
+             f:r=>GIS_OK(r.review_status)});
+    st.push({k:'rev',  t:'To revise',     c:'var(--serious)',s:'returned with comments',
+             f:r=>/revise|reject|comment/i.test(r.review_status||'')});
+    st.push({k:'under',t:'Under review',  c:'var(--warn)',  s:'submitted, awaiting the reviewer',
+             f:r=>!GIS_OK(r.review_status)&&!/revise|reject|comment/i.test(r.review_status||'')&&r.submitted_date});
+    st.push({k:'none', t:'Not submitted', c:'var(--ink3)',  s:'no submission at all',
+             f:r=>!r.submitted_date});
+  } else {
+    st.push({k:'inv',  t:'Invoiced',      c:'var(--good)',  s:'carries an invoice number',
+             f:r=>String(r.invoice_no||'').trim()&&String(r.invoice_no)!=='0'});
+    st.push({k:'sub',  t:'Submitted',     c:'var(--warn)',  s:'submitted, not yet invoiced',
+             f:r=>!(String(r.invoice_no||'').trim()&&String(r.invoice_no)!=='0')&&/submitted/i.test(r.status||'')});
+    st.push({k:'none', t:'Not submitted', c:'var(--ink3)',  s:'still to go',
+             f:r=>!(String(r.invoice_no||'').trim()&&String(r.invoice_no)!=='0')&&!/submitted/i.test(r.status||'')});
+  }
+  /* each record falls in the FIRST state it matches, so nothing is counted twice */
+  const seen=new Set(), out=st.map(x=>({...x,n:0}));
+  rows.forEach(r=>{
+    for(const x of out){ if(!seen.has(r.id)&&x.f(r)){ x.n++; seen.add(r.id); break; } }
+  });
+  const total=rows.length;
+  /* largest remainder, so the percentages add to exactly 100 */
+  let acc=0;
+  out.forEach((x,i)=>{ x.p = total? (i===out.length-1 ? 100-acc : Math.round(x.n/total*100)) : 0;
+    if(i<out.length-1)acc+=x.p; });
+  if(!total)out.forEach(x=>x.p=0);
+  return {rows:out,total};
+}
+function regCards(tab){
+  const {rows,total}=regSplit(tab);
+  const tiles=rows.map(x=>`<div class="kpi regkpi" data-rstate="${esc(x.k)}">
+      <div class="k">${esc(x.t)}</div><div class="v">${x.n}<small>${x.p}%</small></div>
+      <div class="p">${esc(x.s)}</div>
+      <div class="bar"><i style="width:${x.p}%;background:${x.c}"></i></div></div>`).join('');
+  const bar=`<div class="ballbar regbar100">${rows.filter(x=>x.n).map(x=>
+      `<i data-rstate="${esc(x.k)}" title="${esc(x.t)} — ${x.n}"
+          style="width:${x.n/(total||1)*100}%;background:${x.c}"><b>${x.n}</b></i>`).join('')}</div>`;
+  const sum=rows.reduce((t,x)=>t+x.n,0), psum=rows.reduce((t,x)=>t+x.p,0);
+  const label=(TABS.find(t=>t.k===tab)||{}).t||'';
+  return `<div class="panel"><h3>Where the ${total} ${esc(label.toLowerCase())} stand</h3>
+    <div class="kpis">${tiles}</div>${bar}
+    <div class="legtot"><b>${sum} of ${total}</b> records · <b>${psum}%</b> —
+      every record is in exactly one of these states${
+        sum===total&&psum===100?'':' <span class="bad">(does not close)</span>'}</div></div>`;
+}
+function wireRegCards(){
+  document.querySelectorAll('[data-rstate]').forEach(el=>{
+    el.style.cursor='pointer';
+    el.onclick=()=>{ RSTATE=(RSTATE===el.dataset.rstate)?'':el.dataset.rstate;
+      VIEW='reg'; paint(); };
+  });
+}
+
 function paintOverview(){
   /* drawn below, then wired */
   const ab=abFor(), gi=gisFor();
-  $('wrap').innerHTML=`<div class="panels">
+  $('wrap').innerHTML=`${regCards(TAB)}<div class="panels">
     ${bars('As-builts by project', group(ab,r=>projName(r.project_id),r=>AB_DONE(r.status),
         r=>r.project_id),'var(--hot)',{tab:'asbuilts',field:'project_id'})}
     ${bars('As-builts by discipline', group(ab,r=>r.discipline,r=>AB_DONE(r.status)),
@@ -1442,7 +1541,7 @@ function paint(){
   $('crumb').textContent   = onReg?'':VIEWLABEL[VIEW]||'';
   $('crumb').style.display = onReg?'none':'';
   if(onReg){ paintTabs(); paintKpis(); paintTools(); paintTable(); }
-  else if(VIEW==='dash'){ paintKpis(); paintOverview(); wireDash(); }
+  else if(VIEW==='dash'){ paintKpis(); paintOverview(); wireDash(); wireRegCards(); }
   else if(VIEW==='plan'){ paintPlan(); }
   else if(VIEW==='late'){ paintOverdue(); }
   else { paintMore(); }
