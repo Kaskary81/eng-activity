@@ -530,6 +530,14 @@ table.g th.dropR{box-shadow:inset -3px 0 0 var(--accent)}
   #printroot .rtbl tr{page-break-inside:avoid}
   #printroot .rtbl td.n{text-align:center}
 }
+
+/* the small opener at the start of a row */
+table.g th.opencol,table.g td.opencol{width:26px;min-width:26px;max-width:26px;
+  padding:0;text-align:center;background:var(--surface2)}
+.openb{border:none;background:none;color:var(--ink3);cursor:pointer;font-size:12px;
+  line-height:1;padding:3px 4px;border-radius:5px}
+.openb:hover{background:var(--chip);color:var(--accent)}
+table.g tbody tr:hover .openb{color:var(--ink2)}
 </style>
 <script>
 (()=>{ let t=null; try{ t=localStorage.getItem('eng_theme'); }catch(e){}
@@ -584,7 +592,7 @@ table.g th.dropR{box-shadow:inset -3px 0 0 var(--accent)}
 <script>
 const SB_URL='https://ivmmnsjiekhjxkhllncb.supabase.co';
 const SB_KEY='sb_publishable_RTHsaxZXVmRBQziLbFJX8g_PAaZzIbF';
-const BUILD='ENG 2026-09-06 · e30';
+const BUILD='ENG 2026-09-06 · e31';
 
 let SESSION=null, ME=null;
 let PROJECTS=[], PEOPLE=[], AB=[], SD=[], GIS=[], HIST=[], INV=[];
@@ -2175,13 +2183,17 @@ function gridKey(e){
   else if(k==='ArrowLeft'){e.preventDefault();mv(0,-1,e.shiftKey);}
   else if(k==='ArrowRight'||k==='Tab'){e.preventDefault();mv(0,1,e.shiftKey&&k!=='Tab');}
   else if(k==='Enter'){e.preventDefault();beginCellEdit(CUR.r,CUR.c);}
+  else if(k===' '){                       /* the space bar opens the record */
+    e.preventDefault();
+    const row=GRIDROWS[CUR.r]; if(row)openSheet(row.id);
+  }
   else if(k==='Delete'||k==='Backspace'){e.preventDefault();clearSel();}
   else if((e.ctrlKey||e.metaKey)&&k.toLowerCase()==='c'){e.preventDefault();copySel();}
   else if((e.ctrlKey||e.metaKey)&&k.toLowerCase()==='d'){e.preventDefault();fillDown();}
   else if((e.ctrlKey||e.metaKey)&&k.toLowerCase()==='h'){e.preventDefault();findReplaceBox();}
   else if((e.ctrlKey||e.metaKey)&&k.toLowerCase()==='a'){e.preventDefault();
     SEL={r1:0,c1:0,r2:maxR,c2:maxC};CUR={r:0,c:0};paintSel();}
-  else if(k.length===1&&!e.ctrlKey&&!e.metaKey&&!e.altKey){
+  else if(k.length===1&&k!==' '&&!e.ctrlKey&&!e.metaKey&&!e.altKey){
     e.preventDefault(); beginCellEdit(CUR.r,CUR.c,k);
   }
 }
@@ -2219,6 +2231,7 @@ function paintTable(){
     <table class="g${ANIMATE?' fresh':''}"><thead><tr>
       <th class="pickcol"><input type="checkbox" id="pickall" title="Tick every row shown"
         ${rows.length&&rows.every(r=>PICKED.has(r.id))?'checked':''}></th>
+      <th class="opencol"></th>
       ${vcols.map((c,ci)=>
       `<th data-k="${c.k}" class="${(fcls(ci)+((CFILT[c.k]&&CFILT[c.k].length)?' filtered':'')).trim()}"
         style="${fsty(ci)}width:${COLPREF.w[c.k]||c.w}px"
@@ -2228,7 +2241,9 @@ function paintTable(){
     <tbody>${rows.map((r,ri)=>`<tr data-id="${r.id}" data-row="${ri}"
       class="${PICKED.has(r.id)?'picked':''}"${ANIMATE?` style="animation-delay:${Math.min(ri,16)*22}ms"`:''}>
       <td class="pickcol"><input type="checkbox" class="rowpick" data-pick="${r.id}"
-        ${PICKED.has(r.id)?'checked':''}></td>${
+        ${PICKED.has(r.id)?'checked':''}></td>
+      <td class="opencol"><button class="openb" data-open="${r.id}"
+        title="Open this record — or press the space bar">▸</button></td>${
       vcols.map((c,ci)=>{
         const v=c.calc?c.calc(r):r[c.k];
         const txt=(v===null||v===undefined||v==='')?'':String(v);
@@ -2620,7 +2635,7 @@ function wireCells(){
     const r=+td.dataset.r, c=+td.dataset.c;
     td.addEventListener('pointerdown',e=>{
       if(e.button!==0)return;
-      if(e.target.closest('.rowpick'))return;        /* the tick box is its own thing */
+      if(e.target.closest('.rowpick')||e.target.closest('.openb'))return;
       if(e.target.classList&&e.target.classList.contains('cellin'))return;
       e.preventDefault();      /* the cell is selected, not the words inside it */
       w.focus();
@@ -2633,6 +2648,10 @@ function wireCells(){
       document.addEventListener('pointercancel',stop);
     });
     td.addEventListener('dblclick',e=>{ e.stopPropagation(); beginCellEdit(r,c); });
+  });
+  w.querySelectorAll('.openb').forEach(b=>{
+    b.onpointerdown=e=>e.stopPropagation();
+    b.onclick=e=>{ e.stopPropagation(); openSheet(+b.dataset.open); };
   });
   w.onkeydown=gridKey;
   paintSel();
