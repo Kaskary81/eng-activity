@@ -480,6 +480,17 @@ body.windowed .wrap{display:none}
 #dock .st{margin-left:auto;color:var(--ink3);white-space:nowrap}
 #snapghost{position:absolute;border:2px solid var(--accent);background:var(--accent-soft);
   border-radius:12px;display:none;pointer-events:none;z-index:700}
+
+/* the value list in the filter box */
+.flist{max-height:300px;overflow:auto;border:1px solid var(--line);border-radius:9px;
+  padding:4px;background:var(--field)}
+.flist .frow{display:flex;align-items:center;gap:9px;padding:5px 7px;border-radius:6px;cursor:pointer}
+.flist .frow:hover{background:var(--chip)}
+.flist .ft{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--ink)}
+.flist .fn{color:var(--ink3);font-size:11.5px;font-variant-numeric:tabular-nums}
+.fbtns{display:flex;gap:6px;margin-bottom:8px}
+table.g th.filtered{color:var(--accent)}
+table.g th .fmark{font-style:normal;font-size:9px;opacity:.85}
 </style>
 <script>
 (()=>{ let t=null; try{ t=localStorage.getItem('eng_theme'); }catch(e){}
@@ -534,7 +545,7 @@ body.windowed .wrap{display:none}
 <script>
 const SB_URL='https://ivmmnsjiekhjxkhllncb.supabase.co';
 const SB_KEY='sb_publishable_RTHsaxZXVmRBQziLbFJX8g_PAaZzIbF';
-const BUILD='ENG 2026-08-31 · e19';
+const BUILD='ENG 2026-08-31 · e20';
 
 let SESSION=null, ME=null;
 let PROJECTS=[], PEOPLE=[], AB=[], SD=[], GIS=[], HIST=[], INV=[];
@@ -713,6 +724,13 @@ function rowsNow(){
   }
   let rows = TAB==='gis'?gisFor()
            : TAB==='shop'?sdFor() : TAB==='invoice'?invFor() : abFor();
+  /* the column filters set from the right-click menu */
+  const _fc=COLS[TAB]||[];
+  Object.keys(CFILT).forEach(k=>{
+    const set=CFILT[k]; if(!set||!set.length)return;
+    const c=_fc.find(x=>x.k===k); if(!c)return;
+    rows=rows.filter(r=>set.includes(cellText(r,c)));
+  });
   if(F==='open'){
     rows = TAB==='invoice'  ? rows.filter(r=>r.status!=='Submitted')
          : TAB==='asbuilts' ? rows.filter(r=>!AB_DONE(r.status))
@@ -801,6 +819,7 @@ function drillMatch(r){
 function goDrill(tab,field,value,state,label){
   DRILL={tab,field,value,state,label};
   TAB=tab; VIEW='reg'; F=''; Q=''; DF={field:'',from:'',to:''};
+  loadColPref(); loadCFilt();
   paint();
   const w=$wrap(); if(w)w.scrollTop=0;
   const n=rowsNow().length;
@@ -1321,6 +1340,79 @@ document.addEventListener('pointerdown',e=>{ if(_ctx&&!_ctx.contains(e.target))c
 document.addEventListener('keydown',e=>{ if(e.key==='Escape')closeColMenu(); });
 window.addEventListener('resize',closeColMenu);
 
+
+/* ---- per-column filters -------------------------------------------------
+   Right-click a heading and choose Filter: every value in that column, with
+   a count, ticked or not. Kept per register, so the Shop Drawings filters do
+   not follow you to Invoices. */
+let CFILT={};
+function loadCFilt(){ try{ CFILT=JSON.parse(localStorage.getItem('eng_filt_'+TAB)||'{}'); }
+  catch(e){ CFILT={}; } }
+function saveCFilt(){ try{ localStorage.setItem('eng_filt_'+TAB,JSON.stringify(CFILT)); }catch(e){} }
+function cellText(r,c){
+  const v=c.calc?c.calc(r):r[c.k];
+  return (v===null||v===undefined||v==='')?'':String(v);
+}
+/* the rows a column filter would leave, ignoring that column's own filter so
+   the list still shows everything you could tick */
+function rowsForFilter(exceptKey){
+  const cols=COLS[TAB]||[];
+  return rowsOf(TAB).filter(r=>{
+    for(const k in CFILT){
+      if(k===exceptKey)continue;
+      const set=CFILT[k]; if(!set||!set.length)continue;
+      const c=cols.find(x=>x.k===k); if(!c)continue;
+      if(!set.includes(cellText(r,c)))return false;
+    }
+    return true;
+  });
+}
+function colFilterBox(k,cols){
+  const c=cols.find(x=>x.k===k); if(!c)return;
+  const rows=rowsForFilter(k);
+  const counts=new Map();
+  rows.forEach(r=>{ const t=cellText(r,c); counts.set(t,(counts.get(t)||0)+1); });
+  const vals=[...counts.keys()].sort((a,b)=>
+    (a===''?1:b===''?-1:0) || String(a).localeCompare(String(b),undefined,{numeric:true}));
+  const on=CFILT[k]||null;                 /* null means everything */
+  const list=vals.map((v,i)=>
+    `<label class="frow"><input type="checkbox" data-v="${esc(v)}" ${
+      (!on||on.includes(v))?'checked':''}>
+      <span class="ft">${v===''?'<i>(blank)</i>':esc(v)}</span>
+      <span class="fn">${counts.get(v)}</span></label>`).join('');
+  msgBox('Filter · '+c.t,
+    `<input class="f" id="fsearch" placeholder="Search these values…" style="margin-bottom:8px">
+     <div class="fbtns">
+       <button class="btn" id="fall">Select all</button>
+       <button class="btn" id="fnone">Clear</button>
+       <button class="btn" id="finv">Invert</button>
+     </div>
+     <div class="flist" id="flist">${list}</div>
+     <div class="hint" id="fcount"></div>`,
+    [['Cancel',null,''],['Apply',()=>{
+        const boxes=[...document.querySelectorAll('#flist input')];
+        const picked=boxes.filter(b=>b.checked).map(b=>b.dataset.v);
+        if(picked.length===boxes.length)delete CFILT[k]; else CFILT[k]=picked;
+        saveCFilt(); paintTable(); redrawWins&&redrawWins();
+      },'primary']]);
+  const m=document.getElementById('msg');
+  const upd=()=>{
+    const b=[...m.querySelectorAll('#flist input')];
+    const n=b.filter(x=>x.checked).length;
+    m.querySelector('#fcount').textContent=n+' of '+b.length+' values shown';
+  };
+  m.querySelector('#fsearch').oninput=e=>{
+    const q=e.target.value.toLowerCase();
+    m.querySelectorAll('#flist .frow').forEach(el=>{
+      el.style.display=el.textContent.toLowerCase().includes(q)?'':'none';});
+  };
+  m.querySelector('#fall').onclick=()=>{ m.querySelectorAll('#flist input').forEach(b=>b.checked=true); upd(); };
+  m.querySelector('#fnone').onclick=()=>{ m.querySelectorAll('#flist input').forEach(b=>b.checked=false); upd(); };
+  m.querySelector('#finv').onclick=()=>{ m.querySelectorAll('#flist input').forEach(b=>b.checked=!b.checked); upd(); };
+  m.querySelectorAll('#flist input').forEach(b=>b.onchange=upd);
+  upd();
+}
+
 function colMenu(ev,k,cols){
   ev.preventDefault(); ev.stopPropagation(); closeColMenu();
   const i=cols.findIndex(c=>c.k===k); if(i<0)return;
@@ -1332,6 +1424,9 @@ function colMenu(ev,k,cols){
   m.innerHTML=`<div class="hd">${esc(col.t)}</div>`+
     item('Sort A to Z', SORT.k===k&&SORT.dir>0?'▲ on':'▲')+
     item('Sort Z to A', SORT.k===k&&SORT.dir<0?'▼ on':'▼')+'<hr>'+
+    item('Filter…', (CFILT[k]&&CFILT[k].length)?'on':'')+
+    item('Clear this filter','',!(CFILT[k]&&CFILT[k].length))+
+    item('Clear every filter','',!Object.keys(CFILT).length)+'<hr>'+
     item('Move left','←',i===0)+
     item('Move right','→',i===cols.length-1)+
     item('Move to the front','',i===0)+'<hr>'+
@@ -1350,7 +1445,10 @@ function colMenu(ev,k,cols){
     const a=b.dataset.a; closeColMenu();
     const order=(COLPREF.order&&COLPREF.order.length)?COLPREF.order.slice():cols.map(c=>c.k);
     const at=order.indexOf(k);
-    if(a==='Sort A to Z'){ SORT={k,dir:1}; }
+    if(a==='Filter…'){ colFilterBox(k,cols); return; }
+    else if(a==='Clear this filter'){ delete CFILT[k]; saveCFilt(); }
+    else if(a==='Clear every filter'){ CFILT={}; saveCFilt(); }
+    else if(a==='Sort A to Z'){ SORT={k,dir:1}; }
     else if(a==='Sort Z to A'){ SORT={k,dir:-1}; }
     else if(a==='Move left'&&at>0){ order.splice(at,1); order.splice(at-1,0,k); COLPREF.order=order; }
     else if(a==='Move right'&&at<order.length-1){ order.splice(at,1); order.splice(at+1,0,k); COLPREF.order=order; }
@@ -1606,8 +1704,10 @@ function paintTable(){
   const fcls=i=>i<fz?(' frz'+(i===fz-1?' frzlast':'')):'';
   const fsty=i=>i<fz?`left:${frozenLeft(vcols,i)}px;`:'';
   $wrap().innerHTML=`<table class="g"><thead><tr>${vcols.map((c,ci)=>
-      `<th data-k="${c.k}" class="${fcls(ci).trim()}" style="${fsty(ci)}width:${COLPREF.w[c.k]||c.w}px"
+      `<th data-k="${c.k}" class="${(fcls(ci)+((CFILT[c.k]&&CFILT[c.k].length)?' filtered':'')).trim()}"
+        style="${fsty(ci)}width:${COLPREF.w[c.k]||c.w}px"
         title="Right-click, or shift-click, for column options">${c.t}${
+        (CFILT[c.k]&&CFILT[c.k].length)?' <i class="fmark">▼</i>':''}${
         SORT.k===c.k?(SORT.dir>0?' ▲':' ▼'):''}</th>`).join('')}</tr></thead>
     <tbody>${rows.map((r,i)=>`<tr data-id="${r.id}" style="cursor:pointer;animation-delay:${Math.min(i,16)*22}ms">${
       vcols.map((c,ci)=>{
