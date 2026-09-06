@@ -889,6 +889,11 @@ table.g tbody tr:hover .openb{color:var(--ink2)}
 .mcard.remade{animation:remade .26s var(--spring) both}
 @keyframes remade{from{transform:scale(.965);opacity:.4}to{transform:none;opacity:1}}
 @media (prefers-reduced-motion:reduce){.shatter{display:none}}
+
+/* a figure card that can be held */
+.mkpi .kpi[data-rstate]{position:relative;-webkit-tap-highlight-color:transparent}
+.mkpi .kpi.cracked{opacity:0}
+.mkpi .kpi.remade{animation:remade .26s var(--spring) both}
 </style>
 <script>
 (()=>{ let t=null; try{ t=localStorage.getItem('eng_theme'); }catch(e){}
@@ -946,7 +951,7 @@ table.g tbody tr:hover .openb{color:var(--ink2)}
 <script>
 const SB_URL='https://ivmmnsjiekhjxkhllncb.supabase.co';
 const SB_KEY='sb_publishable_RTHsaxZXVmRBQziLbFJX8g_PAaZzIbF';
-const BUILD='ENG 2026-09-06 · e63';
+const BUILD='ENG 2026-09-06 · e64';
 
 let SESSION=null, ME=null;
 let PROJECTS=[], PEOPLE=[], AB=[], SD=[], GIS=[], HIST=[], INV=[];
@@ -2918,6 +2923,7 @@ function shatter(el,then){
   const N=7;
   /* a rough centre the cracks radiate from, off-centre so it looks struck */
   const cx=35+Math.random()*30, cy=30+Math.random()*40;
+  const cs=getComputedStyle(el);
   const stage=document.createElement('div');
   stage.className='shatter';
   stage.style.cssText=`left:${r.left}px;top:${r.top}px;width:${r.width}px;height:${r.height}px`;
@@ -2932,6 +2938,11 @@ function shatter(el,then){
     const p1=rim[i], p2=rim[(i+1)%N];
     const piece=document.createElement('div');
     piece.className='shard';
+    /* borrow the broken thing's own surface, so an overview card breaks as an
+       overview card and a register card as a register card */
+    piece.style.background=cs.backgroundColor;
+    piece.style.borderRadius=cs.borderRadius;
+    piece.style.padding=cs.padding;
     piece.style.clipPath=`polygon(${cx}% ${cy}%, ${p1[0]}% ${p1[1]}%, ${p2[0]}% ${p2[1]}%)`;
     piece.innerHTML=el.innerHTML;
     /* where this piece is thrown */
@@ -2953,6 +2964,41 @@ function shatter(el,then){
     setTimeout(()=>el.classList.remove('remade'),260);
     if(then)then();
   },430);
+}
+
+
+/* Holding a figure on the Overview breaks it, then filters the register to
+   those records — the same thing a tap does, with the break to confirm it. */
+function wireOverviewHold(){
+  document.querySelectorAll('.mkpi .kpi[data-rstate]').forEach(card=>{
+    if(card._hold)return; card._hold=1;
+    let t=null, fired=false, sx=0, sy=0;
+    const go=()=>{ fired=true;
+      shatter(card,()=>{
+        const st=card.dataset.rstate;
+        RSTATE=(RSTATE===st)?'':st; VIEW='reg'; paint();
+      });
+    };
+    const start=e=>{
+      const p=e.touches?e.touches[0]:e;
+      sx=p.clientX; sy=p.clientY; fired=false;
+      clearTimeout(t); t=setTimeout(go,420);
+    };
+    const move=e=>{
+      const p=e.touches?e.touches[0]:e;
+      if(Math.abs(p.clientX-sx)+Math.abs(p.clientY-sy)>10)clearTimeout(t);
+    };
+    const stop=()=>clearTimeout(t);
+    card.addEventListener('touchstart',start,{passive:true});
+    card.addEventListener('touchmove',move,{passive:true});
+    card.addEventListener('touchend',stop);
+    card.addEventListener('touchcancel',stop);
+    card.addEventListener('pointerdown',e=>{ if(e.pointerType!=='touch')start(e); });
+    card.addEventListener('pointerup',stop);
+    card.addEventListener('pointerleave',stop);
+    /* a plain tap still filters at once; the hold has already done it */
+    card.addEventListener('click',e=>{ if(fired){ e.preventDefault(); e.stopPropagation(); fired=false; } },true);
+  });
 }
 
 function cardMenu(id){
@@ -3754,7 +3800,8 @@ function paintOverview(){
   const {rows:states,total}=regSplit(TAB);
   const label=(TABS.find(t=>t.k===TAB)||{}).t||'';
   const src=rowsOf(TAB);
-  if(isPhone()&&total){ $wrap().innerHTML=mobOverview(); wireRegCards(); return; }
+  if(isPhone()&&total){ $wrap().innerHTML=mobOverview(); wireRegCards();
+    attachLoupe(); wireOverviewHold(); return; }
   if(isPhone()&&!total){
     $wrap().innerHTML=`<div class="dsec"><div class="dhead"><h3>${esc(label)}</h3></div>
       <div class="hint">Nothing in this register${PROJ?' for '+esc(projName(PROJ)):''} yet.</div></div>`;
