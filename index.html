@@ -846,21 +846,7 @@ table.g tbody tr:hover .openb{color:var(--ink2)}
 .bignum{font-family:var(--mono);font-size:34px;font-weight:700;letter-spacing:-.04em;
   color:var(--critical);line-height:1}
 
-/* the reading glass */
-.ctip{position:fixed;z-index:3000;pointer-events:none;opacity:0;transition:opacity .12s;
-  background:#0d1b2a;color:#eef2f6;border-radius:9px;padding:8px 10px;font-size:11.5px;
-  box-shadow:0 10px 30px rgba(0,0,0,.34);max-width:250px;border:1px solid rgba(255,255,255,.09)}
-.ctip.on{opacity:1}
-.ctip b{font-family:var(--mono);font-weight:700}
-.ctip>b{font-family:inherit;display:block;margin-bottom:4px;font-size:11px;
-  text-transform:uppercase;letter-spacing:.06em;color:#9fb0c0}
-.ctip .tl{display:flex;justify-content:space-between;gap:14px;padding:1.5px 0}
-.ctip .tl span{color:#c3d0db}
-.ctip .th{margin-top:5px;padding-top:5px;border-top:1px solid rgba(255,255,255,.12);
-  font-size:9.5px;text-transform:uppercase;letter-spacing:.08em;color:#7d8fa0}
-/* the rest of the bar steps back while you are on one part of it */
-.dbar.focus i,.dtrack.focus i,.hbar.focus i{opacity:.26;transition:opacity .12s}
-.dbar.focus i.on,.dtrack.focus i.on,.hbar.focus i.on{opacity:1}
+
 
 
 
@@ -882,6 +868,11 @@ table.g tbody tr:hover .openb{color:var(--ink2)}
 #loupe .lpseg.on{border-color:var(--accent);background:var(--accent-soft);
   transform:translateY(-3px)}
 #loupe .lphint{font-size:10px;color:var(--ink3);text-align:center;margin-top:8px}
+
+/* a chart is for pressing, not for selecting words */
+.dbar,.dtrack,.hbar,.dchips,.mkpi .kpi .bar,#loupe{
+  user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
+.dbar i,.dtrack i,.hbar i{-webkit-tap-highlight-color:transparent}
 </style>
 <script>
 (()=>{ let t=null; try{ t=localStorage.getItem('eng_theme'); }catch(e){}
@@ -939,7 +930,7 @@ table.g tbody tr:hover .openb{color:var(--ink2)}
 <script>
 const SB_URL='https://ivmmnsjiekhjxkhllncb.supabase.co';
 const SB_KEY='sb_publishable_RTHsaxZXVmRBQziLbFJX8g_PAaZzIbF';
-const BUILD='ENG 2026-09-06 · e61';
+const BUILD='ENG 2026-09-06 · e62';
 
 let SESSION=null, ME=null;
 let PROJECTS=[], PEOPLE=[], AB=[], SD=[], GIS=[], HIST=[], INV=[];
@@ -3610,32 +3601,6 @@ function mobOverview(){
 }
 
 
-/* ============================================================
-   The reading glass over a chart: hover or hold a colour and it
-   says what that segment is, how many, and what share — the rest
-   of the bar dims so the one you are on stands out. Same as the
-   LOD tracker.
-   ============================================================ */
-let TIP=null;
-function tipEl(){ if(TIP)return TIP;
-  TIP=document.createElement('div'); TIP.className='ctip';
-  document.body.appendChild(TIP); return TIP; }
-function showTip(html,x,y){
-  const t=tipEl(); t.innerHTML=html; t.classList.add('on');
-  const r=t.getBoundingClientRect();
-  t.style.left=Math.min(innerWidth-r.width-10,Math.max(8,x-r.width/2))+'px';
-  t.style.top=(y-r.height-14<8 ? y+18 : y-r.height-14)+'px';
-}
-function moveTip(e){
-  const t=tipEl(); if(!t.classList.contains('on'))return;
-  t.style.left=Math.min(innerWidth-t.offsetWidth-10,Math.max(8,e.clientX-t.offsetWidth/2))+'px';
-  t.style.top=(e.clientY-t.offsetHeight-14<8 ? e.clientY+18 : e.clientY-t.offsetHeight-14)+'px';
-}
-function hideTip(){ if(TIP)TIP.classList.remove('on'); }
-document.addEventListener('scroll',hideTip,true);
-
-/* every coloured segment on the dashboard gets it */
-
 
 /* ===== THE LOUPE ========================================================
    A one-record slice of a stacked bar is about two pixels wide on a phone.
@@ -3697,8 +3662,6 @@ function attachLoupe(){
     bar.addEventListener('touchstart',e=>{
       const t=e.touches[0]; if(!t)return;
       open(bar.getBoundingClientRect().top);
-      /* start on whatever the finger is over in the ORIGINAL bar, so a plain
-         tap still picks the thing under the thumb */
       let i=-1;
       segs.forEach((sg,j)=>{const b=sg.getBoundingClientRect();
         if(t.clientX>=b.left&&t.clientX<=b.right)i=j;});
@@ -3717,39 +3680,6 @@ function attachLoupe(){
     };
     bar.addEventListener('touchend',()=>end(true));
     bar.addEventListener('touchcancel',()=>end(false));
-  });
-}
-
-function wireChartTips(){
-  document.querySelectorAll('.dbar i,.dtrack i,.hbar i,.kpi .bar i').forEach(seg=>{
-    if(seg._tip)return; seg._tip=1;
-    const box=seg.closest('.dbar,.dtrack,.hbar');
-    const label=seg.getAttribute('title')||'';
-    /* the state names contain a dash themselves ("I — for information"), so
-       split on the LAST one, which is the separator we added */
-    const cut=label.lastIndexOf(' — ');
-    const name=cut>0?label.slice(0,cut).trim():label.trim();
-    const count=cut>0?label.slice(cut+3).trim():'';
-    const total=box?[...box.children].reduce((t,i)=>t+(parseFloat(i.style.flex)||
-      parseFloat(i.style.width)||0),0):0;
-    const share=(()=>{
-      const w=parseFloat(seg.style.width);
-      if(!isNaN(w))return Math.round(w)+'%';
-      const f=parseFloat(seg.style.flex);
-      return (!isNaN(f)&&total)?Math.round(f/total*100)+'%':'';
-    })();
-    const html=`<b>${esc(name||'segment')}</b>
-      ${count?`<div class="tl"><span>records</span><b>${esc(count)}</b></div>`:''}
-      ${share?`<div class="tl"><span>share</span><b>${esc(share)}</b></div>`:''}
-      ${seg.dataset.rstate?'<div class="th">tap to filter</div>':''}`;
-    const on=e=>{ if(box)box.classList.add('focus'); seg.classList.add('on');
-      showTip(html,e.clientX,e.clientY); };
-    const off=()=>{ hideTip(); if(box)box.classList.remove('focus'); seg.classList.remove('on'); };
-    seg.style.cursor=seg.dataset.rstate?'pointer':'default';
-    seg.addEventListener('pointerenter',on);
-    seg.addEventListener('pointermove',moveTip);
-    seg.addEventListener('pointerleave',off);
-    /* the LOD shows this on hover only; a tap on a phone filters, as before */
   });
 }
 
@@ -3887,7 +3817,7 @@ function paint(){
   $('crumb').textContent   = onReg?'':VIEWLABEL[VIEW]||'';
   $('crumb').style.display = onReg?'none':'';
   if(onReg){ paintTabs(); paintKpis(); paintTools(); paintTable(); }
-  else if(VIEW==='dash'){ paintKpis(); paintOverview(); wireDash(); wireRegCards(); wireChartTips(); attachLoupe();
+  else if(VIEW==='dash'){ paintKpis(); paintOverview(); wireDash(); wireRegCards(); attachLoupe();
     document.querySelectorAll('.dtbl tr[data-open]').forEach(tr=>
       tr.onclick=()=>{ VIEW='reg'; paint(); openSheet(+tr.dataset.open); }); }
   else if(VIEW==='plan'){ paintPlan(); }
