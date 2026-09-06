@@ -507,6 +507,21 @@ table.g td .cellin{width:100%;box-sizing:border-box;border:none;outline:none;
 table.g th{position:relative}
 table.g th .cgrip{position:absolute;right:0;top:0;bottom:0;width:6px;cursor:col-resize}
 table.g th .cgrip:hover{background:var(--accent)}
+
+/* the tick column and the bar it raises */
+table.g th.pickcol,table.g td.pickcol{width:34px;min-width:34px;max-width:34px;text-align:center;
+  padding:2px 0;background:var(--surface2)}
+table.g tr.picked td{background:var(--accent-soft)}
+#pickbar{position:fixed;left:50%;transform:translateX(-50%);bottom:38px;z-index:900;
+  display:flex;align-items:center;gap:8px;padding:8px 12px;border-radius:12px;
+  background:var(--surface);border:1px solid var(--ring);box-shadow:var(--shadow);font-size:12.5px}
+#pickbar b{color:var(--accent);font-size:14px}
+
+/* moving a column by dragging its heading */
+table.g th[data-k]{cursor:grab}
+table.g th.dragging{opacity:.5}
+table.g th.dropL{box-shadow:inset 3px 0 0 var(--accent)}
+table.g th.dropR{box-shadow:inset -3px 0 0 var(--accent)}
 </style>
 <script>
 (()=>{ let t=null; try{ t=localStorage.getItem('eng_theme'); }catch(e){}
@@ -560,7 +575,7 @@ table.g th .cgrip:hover{background:var(--accent)}
 <script>
 const SB_URL='https://ivmmnsjiekhjxkhllncb.supabase.co';
 const SB_KEY='sb_publishable_RTHsaxZXVmRBQziLbFJX8g_PAaZzIbF';
-const BUILD='ENG 2026-09-06 · e24';
+const BUILD='ENG 2026-09-06 · e25';
 
 let SESSION=null, ME=null;
 let PROJECTS=[], PEOPLE=[], AB=[], SD=[], GIS=[], HIST=[], INV=[];
@@ -1988,13 +2003,19 @@ function paintTable(){
   GRIDROWS=rows; GRIDCOLS=vcols;
   if(CUR.r>rows.length-1)CUR={r:0,c:0};
   $wrap().innerHTML=`<div id="gwrap" tabindex="0" class="${WRAPCELLS?'wrapcells':''}">
-    <table class="g"><thead><tr>${vcols.map((c,ci)=>
+    <table class="g"><thead><tr>
+      <th class="pickcol"><input type="checkbox" id="pickall" title="Tick every row shown"
+        ${rows.length&&rows.every(r=>PICKED.has(r.id))?'checked':''}></th>
+      ${vcols.map((c,ci)=>
       `<th data-k="${c.k}" class="${(fcls(ci)+((CFILT[c.k]&&CFILT[c.k].length)?' filtered':'')).trim()}"
         style="${fsty(ci)}width:${COLPREF.w[c.k]||c.w}px"
         title="Right-click, or shift-click, for column options"><span class="cgrip" data-g="${c.k}"></span>${c.t}${
         (CFILT[c.k]&&CFILT[c.k].length)?' <i class="fmark">▼</i>':''}${
         SORT.k===c.k?(SORT.dir>0?' ▲':' ▼'):''}</th>`).join('')}</tr></thead>
-    <tbody>${rows.map((r,ri)=>`<tr data-id="${r.id}" data-row="${ri}" style="animation-delay:${Math.min(ri,16)*22}ms">${
+    <tbody>${rows.map((r,ri)=>`<tr data-id="${r.id}" data-row="${ri}"
+      class="${PICKED.has(r.id)?'picked':''}" style="animation-delay:${Math.min(ri,16)*22}ms">
+      <td class="pickcol"><input type="checkbox" class="rowpick" data-pick="${r.id}"
+        ${PICKED.has(r.id)?'checked':''}></td>${
       vcols.map((c,ci)=>{
         const v=c.calc?c.calc(r):r[c.k];
         const txt=(v===null||v===undefined||v==='')?'':String(v);
@@ -2003,7 +2024,7 @@ function paintTable(){
     </tbody></table></div>`;
   $wrap().querySelectorAll('tbody tr[data-id]').forEach(tr=>
     tr.ondblclick=e=>{ if(!e.target.closest('td[data-r]'))openSheet(+tr.dataset.id); });
-  wireCells(); wireColResize();
+  wireCells(); wireColResize(); wireColDrag(); wirePicks(rows);
   $wrap().querySelectorAll('th[data-k]').forEach(th=>{
     th.oncontextmenu=e=>colMenu(e,th.dataset.k,vcols);
     th.onclick=e=>{
@@ -2107,6 +2128,48 @@ function regCards(tab){
 /* pick a cell, drag to take a block, double-click to edit it */
 
 /* drag the edge of a heading to set its width; double-click to fit */
+
+/* drag a heading sideways to put the column somewhere else */
+function wireColDrag(){
+  const ths=[...document.querySelectorAll('table.g th[data-k]')];
+  ths.forEach(th=>{
+    th.setAttribute('draggable','true');
+    th.addEventListener('dragstart',e=>{
+      if(e.target.closest('.cgrip')){ e.preventDefault(); return; }
+      e.dataTransfer.setData('text/plain',th.dataset.k);
+      e.dataTransfer.effectAllowed='move';
+      th.classList.add('dragging');
+    });
+    th.addEventListener('dragend',()=>{
+      th.classList.remove('dragging');
+      ths.forEach(x=>x.classList.remove('dropL','dropR'));
+    });
+    th.addEventListener('dragover',e=>{
+      e.preventDefault();
+      const b=th.getBoundingClientRect();
+      const before=(e.clientX-b.left)<b.width/2;
+      th.classList.toggle('dropL',before);
+      th.classList.toggle('dropR',!before);
+    });
+    th.addEventListener('dragleave',()=>th.classList.remove('dropL','dropR'));
+    th.addEventListener('drop',e=>{
+      e.preventDefault();
+      const from=e.dataTransfer.getData('text/plain'), to=th.dataset.k;
+      th.classList.remove('dropL','dropR');
+      if(!from||from===to)return;
+      const b=th.getBoundingClientRect();
+      const before=(e.clientX-b.left)<b.width/2;
+      const order=(COLPREF.order&&COLPREF.order.length)
+        ? COLPREF.order.slice() : GRIDCOLS.map(c=>c.k);
+      const i=order.indexOf(from); if(i>=0)order.splice(i,1);
+      let j=order.indexOf(to); if(j<0)j=order.length;
+      order.splice(before?j:j+1,0,from);
+      COLPREF.order=order; saveColPref(); paintTable();
+      toast('Column moved');
+    });
+  });
+}
+
 function wireColResize(){
   document.querySelectorAll('table.g th .cgrip').forEach(g=>{
     const k=g.dataset.g;
@@ -2134,25 +2197,134 @@ function wireColResize(){
   });
 }
 
+
+/* ---- ticked rows, for doing something to several at once ---------------- */
+const PICKED=new Set();
+function wirePicks(rows){
+  const all=document.getElementById('pickall');
+  if(all)all.onchange=()=>{ rows.forEach(r=>all.checked?PICKED.add(r.id):PICKED.delete(r.id));
+    paintTable(); };
+  document.querySelectorAll('.rowpick').forEach(b=>{
+    b.onpointerdown=e=>e.stopPropagation();
+    b.onclick=e=>e.stopPropagation();
+    b.onchange=()=>{ const id=+b.dataset.pick;
+      b.checked?PICKED.add(id):PICKED.delete(id);
+      const tr=b.closest('tr'); if(tr)tr.classList.toggle('picked',b.checked);
+      paintPickBar(); };
+  });
+  paintPickBar();
+}
+/* the bar that appears once something is ticked */
+function paintPickBar(){
+  let bar=document.getElementById('pickbar');
+  if(!PICKED.size){ if(bar)bar.remove(); return; }
+  if(!bar){ bar=document.createElement('div'); bar.id='pickbar'; document.body.appendChild(bar); }
+  bar.innerHTML=`<b>${PICKED.size}</b> selected
+    <button class="btn" data-p="plan">Add to the plan…</button>
+    <button class="btn" data-p="status">Set the status…</button>
+    <button class="btn" data-p="copy">Copy</button>
+    ${canEdit()?'<button class="btn danger" data-p="del">Delete</button>':''}
+    <button class="btn" data-p="none">Clear</button>`;
+  bar.querySelectorAll('[data-p]').forEach(b=>b.onclick=()=>pickAction(b.dataset.p));
+}
+function pickedRows(){ return rowsOf(TAB).filter(r=>PICKED.has(r.id)); }
+async function pickAction(a){
+  const rows=pickedRows();
+  if(a==='none'){ PICKED.clear(); paintTable(); return; }
+  if(!rows.length)return;
+  if(a==='copy'){
+    const cols=GRIDCOLS;
+    const text=rows.map(r=>cols.map(c=>cellValue(r,c)).join('\t')).join('\n');
+    try{ await navigator.clipboard.writeText(text); }catch(e){}
+    toast('Copied '+rows.length+' row'+(rows.length>1?'s':''));
+    return;
+  }
+  if(a==='plan'){
+    msgBox('Add '+rows.length+' to the plan',
+      `<label class="fl">Planned submission date</label>
+       <input class="f" id="pdate" type="date" value="${esc(today)}">
+       <div class="hint" style="margin-top:8px">Every ticked record gets this date.</div>`,
+      [['Cancel',null,''],['Set the date',async()=>{
+        const v=document.getElementById('pdate').value;
+        if(!v)return;
+        await applyEdits(rows.map(r=>({row:r,col:{k:'planned_date',t:'Planned'},
+          f:['planned_date','Planned','date'],val:v})),'Planned');
+        PICKED.clear(); paintTable();
+      },'primary']]);
+    return;
+  }
+  if(a==='status'){
+    const f=(EDIT[TAB]||[]).find(x=>x[2]==='sel');
+    if(!f)return toast('This register has no status to set');
+    msgBox('Set '+f[1]+' on '+rows.length+' record'+(rows.length>1?'s':''),
+      `<label class="fl">${esc(f[1])}</label>
+       <select class="f" id="pstat">${(f[3]||[]).map(o=>`<option>${esc(o)}</option>`).join('')}</select>`,
+      [['Cancel',null,''],['Set it',async()=>{
+        const v=document.getElementById('pstat').value;
+        await applyEdits(rows.map(r=>({row:r,col:{k:f[0],t:f[1]},f,val:v})),'Set');
+        PICKED.clear(); paintTable();
+      },'primary']]);
+    return;
+  }
+  if(a==='del'){
+    if(!canEdit())return toast('You have read-only access');
+    msgBox('Delete '+rows.length+' record'+(rows.length>1?'s':''),
+      `<div class="hint">This removes them and their submission history. It cannot be undone.</div>`,
+      [['Cancel',null,''],['Delete',async()=>{
+        let ok=0;
+        for(const r of rows){
+          try{
+            await api('eng_history?kind=eq.'+(TAB==='shop'?'shop':TAB)+'&record_id=eq.'+r.id,{method:'DELETE'});
+            await api(TABLE[TAB]+'?id=eq.'+r.id,{method:'DELETE'});
+            ok++;
+          }catch(e){}
+        }
+        toast('Deleted '+ok+' of '+rows.length);
+        PICKED.clear(); await loadAll(); paint();
+      },'danger']]);
+  }
+}
+
 function wireCells(){
   const w=document.getElementById('gwrap'); if(!w)return;
-  let dragging=false;
+  /* A plain click must pick ONE cell and stop. Dragging only begins once the
+     pointer has actually moved, and the listener that ends it is attached and
+     removed on every drag — the earlier version registered it once, so after
+     the first click the grid never stopped selecting. */
+  let drag=null;
+  const stop=()=>{ drag=null;
+    document.removeEventListener('pointermove',onMove);
+    document.removeEventListener('pointerup',stop);
+    document.removeEventListener('pointercancel',stop); };
+  const onMove=e=>{
+    if(!drag)return;
+    if(!drag.live){
+      if(Math.abs(e.clientX-drag.x)+Math.abs(e.clientY-drag.y)<6)return;   /* a click, not a drag */
+      drag.live=true;
+    }
+    const td=document.elementFromPoint(e.clientX,e.clientY);
+    const cell=td&&td.closest&&td.closest('td[data-r]');
+    if(!cell)return;
+    SEL={...SEL,r2:+cell.dataset.r,c2:+cell.dataset.c};
+    CUR={r:+cell.dataset.r,c:+cell.dataset.c};
+    paintSel();
+  };
   w.querySelectorAll('td[data-r]').forEach(td=>{
     const r=+td.dataset.r, c=+td.dataset.c;
     td.addEventListener('pointerdown',e=>{
       if(e.button!==0)return;
+      if(e.target.closest('.rowpick'))return;        /* the tick box is its own thing */
       w.focus();
       if(e.shiftKey&&SEL){ SEL={...SEL,r2:r,c2:c}; CUR={r,c}; }
-      else { CUR={r,c}; SEL={r1:r,c1:c,r2:r,c2:c}; dragging=true; }
+      else { CUR={r,c}; SEL={r1:r,c1:c,r2:r,c2:c}; }
       paintSel();
-    });
-    td.addEventListener('pointerenter',()=>{
-      if(!dragging)return;
-      SEL={...SEL,r2:r,c2:c}; CUR={r,c}; paintSel();
+      drag={x:e.clientX,y:e.clientY,live:false};
+      document.addEventListener('pointermove',onMove);
+      document.addEventListener('pointerup',stop);
+      document.addEventListener('pointercancel',stop);
     });
     td.addEventListener('dblclick',e=>{ e.stopPropagation(); beginCellEdit(r,c); });
   });
-  document.addEventListener('pointerup',()=>{dragging=false;},{once:true});
   w.onkeydown=gridKey;
   paintSel();
 }
