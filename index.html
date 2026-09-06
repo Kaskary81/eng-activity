@@ -498,7 +498,10 @@ body.windowed #statusline{display:none!important}   /* the taskbar carries it in
 .wrap{padding-bottom:44px}
 
 /* the grid behaving like a spreadsheet */
-#gwrap{outline:none;overflow:auto;max-height:calc(100vh - 300px)}
+#gwrap{outline:none;overflow:auto;max-height:calc(100vh - 300px);
+  user-select:none;-webkit-user-select:none}
+/* the cell being edited is a normal input again */
+#gwrap .cellin{user-select:text;-webkit-user-select:text}
 table.g td.selcell{background:var(--accent-soft)!important}
 table.g td.curcell{box-shadow:inset 0 0 0 2px var(--accent)}
 table.g td .cellin{width:100%;box-sizing:border-box;border:none;outline:none;
@@ -575,7 +578,7 @@ table.g th.dropR{box-shadow:inset -3px 0 0 var(--accent)}
 <script>
 const SB_URL='https://ivmmnsjiekhjxkhllncb.supabase.co';
 const SB_KEY='sb_publishable_RTHsaxZXVmRBQziLbFJX8g_PAaZzIbF';
-const BUILD='ENG 2026-09-06 · e25';
+const BUILD='ENG 2026-09-06 · e26';
 
 let SESSION=null, ME=null;
 let PROJECTS=[], PEOPLE=[], AB=[], SD=[], GIS=[], HIST=[], INV=[];
@@ -2314,6 +2317,8 @@ function wireCells(){
     td.addEventListener('pointerdown',e=>{
       if(e.button!==0)return;
       if(e.target.closest('.rowpick'))return;        /* the tick box is its own thing */
+      if(e.target.classList&&e.target.classList.contains('cellin'))return;
+      e.preventDefault();      /* the cell is selected, not the words inside it */
       w.focus();
       if(e.shiftKey&&SEL){ SEL={...SEL,r2:r,c2:c}; CUR={r,c}; }
       else { CUR={r,c}; SEL={r1:r,c1:c,r2:r,c2:c}; }
