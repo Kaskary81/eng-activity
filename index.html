@@ -659,6 +659,10 @@ table.g tbody tr:hover .openb{color:var(--ink2)}
 .dtbl td.n{text-align:right}
 .dtbl td.late{color:var(--critical);font-weight:700}
 .dmore{font-size:11px;color:var(--ink3);padding-top:6px}
+
+/* the Client's grade letter inside a status pill */
+.pill .grade{font-size:10px;font-weight:800;line-height:1;padding:2px 4px;border-radius:4px;
+  background:currentColor;color:var(--surface);margin-right:1px}
 </style>
 <script>
 (()=>{ let t=null; try{ t=localStorage.getItem('eng_theme'); }catch(e){}
@@ -713,7 +717,7 @@ table.g tbody tr:hover .openb{color:var(--ink2)}
 <script>
 const SB_URL='https://ivmmnsjiekhjxkhllncb.supabase.co';
 const SB_KEY='sb_publishable_RTHsaxZXVmRBQziLbFJX8g_PAaZzIbF';
-const BUILD='ENG 2026-09-06 · e38';
+const BUILD='ENG 2026-09-06 · e39';
 
 let SESSION=null, ME=null;
 let PROJECTS=[], PEOPLE=[], AB=[], SD=[], GIS=[], HIST=[], INV=[];
@@ -811,12 +815,43 @@ const AB_DONE  = s => s==='Submitted';
 const GIS_OK   = s => s==='Approved' || s==='Approved As Noted';
 const GIS_BAD  = s => s==='Revise & Resubmit' || s==='Rejected';
 
+
+/* ---- Ma'aden's review codes -------------------------------------------
+   The Client stamps A, C, R or I — there is no "B" in their scheme, so what
+   an AWPT workbook calls Code B is their C. The same wording and colours as
+   the LOD tracker, so a drawing reads the same in both apps. */
+const MAADEN_GRADE={
+  'Code A':            {g:'A', t:'Accepted',                d:'accepted'},
+  'Code B':            {g:'C', t:'Proceed with exceptions', d:'proceed with exceptions to the next submission and revision'},
+  'Rejected':          {g:'R', t:'Do not proceed',          d:'revise as noted and resubmit'},
+  'Replied':           {g:'I', t:'For information',         d:'issued to the Client for information'},
+  'Deemed':            {g:'A', t:'Deemed accepted',         d:'no reply within 10 working days'},
+  'Under Client review':{g:'', t:'Under Client review',     d:'with Ma\'aden, awaiting their stamp'},
+  'On hold':           {g:'',  t:'On hold',                 d:'held pending a prerequisite'}
+};
+const MAADEN_CODES=['Code A','Code B','Rejected','Replied','Deemed',
+                    'Under Client review','On hold'];
+const maadenLabel=v=>{ const m=MAADEN_GRADE[v];
+  return m ? (m.g?m.g+' — '+m.t:m.t) : (v||''); };
+/* AWPT's own answers on the way out, as the LOD names them */
+const AWPT_CODES=['RNC','RWC','Awaiting reply','Not submitted'];
+const CLASSES=['IFI','IFR','AWPT-only'];
+
 const SCOL={ 'Submitted':'var(--good)','Notsubmitted':'var(--hot)',
   'Approved':'var(--good)','Approved As Noted':'var(--good)','Under Review':'var(--warn)',
   'Revise & Resubmit':'var(--hot)','Rejected':'var(--hot)','Not Submitted':'var(--ink3)',
-  'Open':'var(--warn)','In Progress':'var(--sky)','Resolved':'var(--good)' };
-const pill = s => s ? `<span class="pill" style="background:${SCOL[s]||'var(--chip)'}22;
-  color:${SCOL[s]||'var(--ink2)'}"><i class="dot" style="background:${SCOL[s]||'var(--ink3)'}"></i>${esc(s)}</span>` : '';
+  'Open':'var(--warn)','In Progress':'var(--sky)','Resolved':'var(--good)',
+  /* Ma'aden's codes, coloured as the LOD colours them */
+  'Code A':'#0f9d58','Deemed':'#4bb07a','Code B':'#6fc38a','Rejected':'#d64545',
+  'Replied':'var(--sky)','Under Client review':'var(--warn)','On hold':'#7030a0',
+  'RNC':'#6b7f92','RWC':'#7d8fa0','Awaiting reply':'var(--warn)','For Information':'var(--sky)' };
+const pill = s => { if(!s)return '';
+  const col=SCOL[s]||'var(--chip)', m=MAADEN_GRADE[s];
+  /* the badge already carries the letter, so the words beside it are just
+     the meaning — "A  Accepted", not "A  A — Accepted" */
+  const text=m?(m.g?m.t:m.t):s;
+  return `<span class="pill" title="${esc(m?m.d:s)}" style="background:${col}22;color:${col}">
+    ${m&&m.g?`<b class="grade">${m.g}</b>`:`<i class="dot" style="background:${col}"></i>`}${esc(text)}</span>`; };
 
 /* ---------- the three registers ---------- */
 const TABS=[
@@ -942,7 +977,9 @@ function rowsNow(){
 const TABLE={asbuilts:'eng_asbuilts',shop:'eng_shopdrawings',gis:'eng_gis',
   invoice:'eng_invoice_sections'};
 const REVIEW=['Approved','Approved As Noted','Under Review','Revise & Resubmit',
-              'Rejected','Pending NWC','Not Submitted','Withdrawn','For Information'];
+              'Rejected','Pending NWC','Not Submitted','Withdrawn','For Information',
+              /* Ma'aden's own stamps, used on the Ar Rjum register */
+              'Code A','Code B','Replied','Deemed','Under Client review','On hold'];
 const EDIT={
   _doc:{doc_no:'text',issue_status:'text',action_by:'text'},
   asbuilts:[['submittal_no','Submittal','text'],['description','Drawing','area'],
