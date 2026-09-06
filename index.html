@@ -717,7 +717,7 @@ table.g tbody tr:hover .openb{color:var(--ink2)}
 <script>
 const SB_URL='https://ivmmnsjiekhjxkhllncb.supabase.co';
 const SB_KEY='sb_publishable_RTHsaxZXVmRBQziLbFJX8g_PAaZzIbF';
-const BUILD='ENG 2026-09-06 · e42';
+const BUILD='ENG 2026-09-06 · e43';
 
 let SESSION=null, ME=null;
 let PROJECTS=[], PEOPLE=[], AB=[], SD=[], GIS=[], HIST=[], INV=[];
@@ -2757,9 +2757,10 @@ function regSplit(tab){
     st.push({k:'inv',  t:'Invoiced',      c:'var(--good)',  s:'carries an invoice number',
              f:r=>String(r.invoice_no||'').trim()&&String(r.invoice_no)!=='0'});
     st.push({k:'sub',  t:'Submitted',     c:'var(--warn)',  s:'submitted, not yet invoiced',
-             f:r=>!(String(r.invoice_no||'').trim()&&String(r.invoice_no)!=='0')&&/submitted/i.test(r.status||'')});
-    st.push({k:'none', t:'Not submitted', c:'var(--ink3)',  s:'still to go',
-             f:r=>!(String(r.invoice_no||'').trim()&&String(r.invoice_no)!=='0')&&!/submitted/i.test(r.status||'')});
+             f:r=>!(String(r.invoice_no||'').trim()&&String(r.invoice_no)!=='0')
+                  &&String(r.status||'').trim().toLowerCase()==='submitted'});
+    /* whatever is left — the states are tried in order, so this catches the rest */
+    st.push({k:'none', t:'Not submitted', c:'var(--ink3)',  s:'still to go', f:r=>true});
   }
   /* each record falls in the FIRST state it matches, so nothing is counted twice */
   const seen=new Set(), out=st.map(x=>({...x,n:0}));
@@ -3104,12 +3105,61 @@ function wireRegCards(){
   });
 }
 
+
+/* The invoice register measures work in metres, not documents, so its panels
+   count length as well as sections. */
+function invSections(states){
+  const src=rowsOf('invoice');
+  if(!src.length)return '';
+  const m=r=>Number(r.length_m)||0;
+  const isDone=r=>String(r.invoice_no||'').trim()!=='' ||
+                  String(r.status||'').trim().toLowerCase()==='submitted';
+  const done=src.filter(isDone);
+  const tot=src.reduce((t,r)=>t+m(r),0), got=done.reduce((t,r)=>t+m(r),0);
+  const km=v=>(v/1000).toFixed(1)+' km';
+  const byGroup=(field,title,fmt)=>{
+    const keys=[...new Set(src.map(r=>String(r[field]||'(not set)')))]
+      .map(k=>{ const rows=src.filter(r=>String(r[field]||'(not set)')===k);
+        return {k,n:rows.length,len:rows.reduce((t,r)=>t+m(r),0),
+                dn:rows.filter(isDone).length}; })
+      .sort((a,b)=>b.len-a.len);
+    if(keys.length<2)return '';
+    const max=keys[0].len||1;
+    return `<div class="dsec"><div class="dhead"><h3>${esc(title)}</h3>
+        <span>${keys.length} groups · ${km(tot)} in total</span></div>
+      ${keys.slice(0,12).map(g=>`<div class="drow">
+        <div class="dlab" title="${esc(g.k)}">${esc(fmt?fmt(g.k):g.k)}</div>
+        <div class="dtrack" style="width:${g.len/max*100}%">
+          <i style="flex:${g.dn};background:var(--good)"></i>
+          <i style="flex:${g.n-g.dn};background:var(--warn)"></i></div>
+        <div class="dn">${km(g.len)}</div>
+        <div class="dp">${g.dn}/${g.n}</div></div>`).join('')}
+      ${keys.length>12?`<div class="dmore">and ${keys.length-12} more</div>`:''}</div>`;
+  };
+  return `<div class="dsec">
+      <div class="dhead"><h3>Length invoiced</h3>
+        <span>${done.length} of ${src.length} sections</span></div>
+      <div class="dbar">
+        <i style="width:${tot?got/tot*100:0}%;background:var(--good)"><b>${km(got)}</b></i>
+        <i style="width:${tot?(tot-got)/tot*100:0}%;background:var(--warn)"><b>${km(tot-got)}</b></i>
+      </div>
+      <div class="dnote">${km(got)} of ${km(tot)} — ${Math.round(tot?got/tot*100:0)}% of the network</div>
+    </div>`
+    + byGroup('diameter_mm','By diameter',k=>k==='(not set)'?k:('Ø'+k+' mm'))
+    + byGroup('method','By method');
+}
+
 function paintOverview(){
   /* The LOD's shape: a few full-width sections, each one saying a whole
      thing, rather than a grid of small panels. */
   const {rows:states,total}=regSplit(TAB);
   const label=(TABS.find(t=>t.k===TAB)||{}).t||'';
   const src=rowsOf(TAB);
+  if(!total){
+    $wrap().innerHTML=`<div class="dsec"><div class="dhead"><h3>${esc(label)}</h3></div>
+      <div class="hint">Nothing in this register${PROJ?' for '+esc(projName(PROJ)):''} yet.</div></div>`;
+    return;
+  }
 
   /* 1. what needs acting on — planned, past its date, still not sent */
   const late=src.filter(r=>r.planned_date && r.planned_date<today &&
@@ -3149,7 +3199,12 @@ function paintOverview(){
   const discSec = discSection('discipline','By discipline',states);
   const zoneSec = discSection('zone','By zone',states);
 
-  $wrap().innerHTML = stand + lateSec + discSec + zoneSec + dailyPanel();
+  /* a panel with nothing to say is left out, and the invoice register gets
+     the ones that suit it */
+  const daily = (typeof dailyPanel==='function' && rowsOf(TAB).some(r=>r.submitted_date||r.received_date))
+    ? dailyPanel() : '';
+  const extra = TAB==='invoice' ? invSections(states) : (discSec + zoneSec);
+  $wrap().innerHTML = stand + lateSec + extra + daily;
 }
 /* one row per value, split by the same states, so the totals agree with the
    bar above */
