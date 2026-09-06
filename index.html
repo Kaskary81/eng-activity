@@ -491,6 +491,11 @@ body.windowed .wrap{display:none}
 .fbtns{display:flex;gap:6px;margin-bottom:8px}
 table.g th.filtered{color:var(--accent)}
 table.g th .fmark{font-style:normal;font-size:9px;opacity:.85}
+
+/* the status line sits along the very bottom, out of the way */
+#statusline{position:fixed;left:0;right:0;bottom:0;z-index:850}
+body.windowed #statusline{display:none!important}   /* the taskbar carries it instead */
+.wrap{padding-bottom:44px}
 </style>
 <script>
 (()=>{ let t=null; try{ t=localStorage.getItem('eng_theme'); }catch(e){}
@@ -510,7 +515,6 @@ table.g th .fmark{font-style:normal;font-size:9px;opacity:.85}
   </div>
 </div>
 
-<div id="statusline" style="display:none"></div>
 <div id="app">
   <div id="topbar">
     <div class="mark"></div>
@@ -545,7 +549,7 @@ table.g th .fmark{font-style:normal;font-size:9px;opacity:.85}
 <script>
 const SB_URL='https://ivmmnsjiekhjxkhllncb.supabase.co';
 const SB_KEY='sb_publishable_RTHsaxZXVmRBQziLbFJX8g_PAaZzIbF';
-const BUILD='ENG 2026-08-31 · e21';
+const BUILD='ENG 2026-08-31 · e22';
 
 let SESSION=null, ME=null;
 let PROJECTS=[], PEOPLE=[], AB=[], SD=[], GIS=[], HIST=[], INV=[];
@@ -1424,7 +1428,7 @@ function colFilterBox(k,cols){
         const boxes=[...document.querySelectorAll('#flist input')];
         const picked=boxes.filter(b=>b.checked).map(b=>b.dataset.v);
         if(picked.length===boxes.length)delete CFILT[k]; else CFILT[k]=picked;
-        saveCFilt(); paintTable(); redrawWins&&redrawWins();
+        saveCFilt(); paint(); if(typeof redrawWins==='function')redrawWins();
       },'primary']]);
   const m=document.getElementById('msg');
   const upd=()=>{
@@ -1477,8 +1481,8 @@ function colMenu(ev,k,cols){
     const order=(COLPREF.order&&COLPREF.order.length)?COLPREF.order.slice():cols.map(c=>c.k);
     const at=order.indexOf(k);
     if(a==='Filter…'){ colFilterBox(k,cols); return; }
-    else if(a==='Clear this filter'){ delete CFILT[k]; saveCFilt(); }
-    else if(a==='Clear every filter'){ CFILT={}; saveCFilt(); }
+    else if(a==='Clear this filter'){ delete CFILT[k]; saveCFilt(); paint(); return; }
+    else if(a==='Clear every filter'){ CFILT={}; saveCFilt(); paint(); return; }
     else if(a==='Sort A to Z'){ SORT={k,dir:1}; }
     else if(a==='Sort Z to A'){ SORT={k,dir:-1}; }
     else if(a==='Move left'&&at>0){ order.splice(at,1); order.splice(at-1,0,k); COLPREF.order=order; }
@@ -1999,5 +2003,6 @@ $('out').onclick=()=>{try{localStorage.removeItem('eng-session');}catch(e){}loca
   loadDirectory();
 })();
 </script>
+<div id="statusline" style="display:none"></div>
 </body>
 </html>
