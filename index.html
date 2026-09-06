@@ -431,6 +431,10 @@ table.g th.frzlast,table.g td.frzlast{border-right:2px solid var(--accent)}
   #printroot .rtbl tr{break-inside:avoid}
 }
 </style>
+<script>
+(()=>{ let t=null; try{ t=localStorage.getItem('eng_theme'); }catch(e){}
+  document.documentElement.setAttribute('data-theme',(t==='light'||t==='dark')?t:'dark'); })();
+</script>
 </head>
 <body>
 
@@ -474,7 +478,7 @@ table.g th.frzlast,table.g td.frzlast{border-right:2px solid var(--accent)}
 <script>
 const SB_URL='https://ivmmnsjiekhjxkhllncb.supabase.co';
 const SB_KEY='sb_publishable_RTHsaxZXVmRBQziLbFJX8g_PAaZzIbF';
-const BUILD='ENG 2026-08-31 · e15';
+const BUILD='ENG 2026-08-31 · e16';
 
 let SESSION=null, ME=null;
 let PROJECTS=[], PEOPLE=[], AB=[], SD=[], GIS=[], HIST=[], INV=[];
@@ -1299,6 +1303,17 @@ function shownCols(cols){
 function frozenLeft(cols,i){
   let x=0; for(let j=0;j<i;j++)x+=(COLPREF.w[cols[j].k]||cols[j].w||140);
   return x;
+}
+
+
+/* Light or dark, remembered on this machine. Dark is the default, to match
+   the LOD tracker as it is normally used. */
+function toggleTheme(){
+  const r=document.documentElement;
+  const t=r.getAttribute('data-theme')==='dark'?'light':'dark';
+  r.setAttribute('data-theme',t);
+  try{ localStorage.setItem('eng_theme',t); }catch(e){}
+  toast(t==='dark'?'Dark':'Light');
 }
 
 function paintTable(){
