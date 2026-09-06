@@ -140,7 +140,8 @@ table.g{border-collapse:separate;border-spacing:0;font-size:12px;table-layout:fi
 table.g th{position:sticky;top:0;z-index:4;text-align:left;padding:6px 8px;font-size:11px;font-weight:600;color:var(--ink2);background:var(--surface2);border-bottom:1px solid var(--grid);user-select:none;cursor:pointer;white-space:nowrap}
 table.g th:hover{color:var(--accent)}
 table.g td{border-right:1px solid var(--grid);border-bottom:1px solid var(--grid);padding:4px 7px;text-align:left;vertical-align:top;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;background:var(--surface)}
-table.g tbody tr{animation:rise .35s var(--ease) both}
+table.g tbody tr{animation:none}
+table.g.fresh tbody tr{animation:rise .35s var(--ease) both}
 table.g tbody tr:nth-child(even) td{background:var(--card2)}
 table.g tbody tr:hover td{background:var(--chip)}
 td.mono{font-family:var(--mono);color:var(--ink)}
@@ -578,7 +579,7 @@ table.g th.dropR{box-shadow:inset -3px 0 0 var(--accent)}
 <script>
 const SB_URL='https://ivmmnsjiekhjxkhllncb.supabase.co';
 const SB_KEY='sb_publishable_RTHsaxZXVmRBQziLbFJX8g_PAaZzIbF';
-const BUILD='ENG 2026-09-06 · e26';
+const BUILD='ENG 2026-09-06 · e27';
 
 let SESSION=null, ME=null;
 let PROJECTS=[], PEOPLE=[], AB=[], SD=[], GIS=[], HIST=[], INV=[];
@@ -1769,6 +1770,8 @@ function openOverdueWindow(){
 let SEL=null;                 /* {r1,c1,r2,c2} in visible row/column order */
 let CUR={r:0,c:0};
 let GRIDROWS=[], GRIDCOLS=[];
+let ANIMATE=true;          /* only the first draw of a new row set glides in */
+let _lastSig='';
 let WRAPCELLS=false;
 try{ WRAPCELLS=localStorage.getItem('eng_wrap')==='1'; }catch(e){}
 
@@ -1938,8 +1941,13 @@ function beginCellEdit(r,c,seed){
   const finish=async commit=>{
     if(done)return; done=true;
     const v=el.value;
-    if(commit && v!==cur) await applyEdits([{row,col,f,val:v}],'Saved');
-    else paintTable();
+    if(commit && v!==cur){ await applyEdits([{row,col,f,val:v}],'Saved'); }
+    else {
+      /* nothing changed — put the cell back as it was, without redrawing the
+         table, which used to replay the row animation every time */
+      td.innerHTML = col.pill?pill(cur):esc(cur);
+      paintSel();
+    }
     const w=document.getElementById('gwrap'); if(w)w.focus();
   };
   el.addEventListener('blur',()=>finish(true));
@@ -2004,9 +2012,12 @@ function paintTable(){
   const fcls=i=>i<fz?(' frz'+(i===fz-1?' frzlast':'')):'';
   const fsty=i=>i<fz?`left:${frozenLeft(vcols,i)}px;`:'';
   GRIDROWS=rows; GRIDCOLS=vcols;
+  /* the same rows redrawn should not re-animate */
+  const sig=TAB+'|'+rows.length+'|'+rows.map(r=>r.id).join(',');
+  ANIMATE=(sig!==_lastSig); _lastSig=sig;
   if(CUR.r>rows.length-1)CUR={r:0,c:0};
   $wrap().innerHTML=`<div id="gwrap" tabindex="0" class="${WRAPCELLS?'wrapcells':''}">
-    <table class="g"><thead><tr>
+    <table class="g${ANIMATE?' fresh':''}"><thead><tr>
       <th class="pickcol"><input type="checkbox" id="pickall" title="Tick every row shown"
         ${rows.length&&rows.every(r=>PICKED.has(r.id))?'checked':''}></th>
       ${vcols.map((c,ci)=>
@@ -2016,7 +2027,7 @@ function paintTable(){
         (CFILT[c.k]&&CFILT[c.k].length)?' <i class="fmark">▼</i>':''}${
         SORT.k===c.k?(SORT.dir>0?' ▲':' ▼'):''}</th>`).join('')}</tr></thead>
     <tbody>${rows.map((r,ri)=>`<tr data-id="${r.id}" data-row="${ri}"
-      class="${PICKED.has(r.id)?'picked':''}" style="animation-delay:${Math.min(ri,16)*22}ms">
+      class="${PICKED.has(r.id)?'picked':''}"${ANIMATE?` style="animation-delay:${Math.min(ri,16)*22}ms"`:''}>
       <td class="pickcol"><input type="checkbox" class="rowpick" data-pick="${r.id}"
         ${PICKED.has(r.id)?'checked':''}></td>${
       vcols.map((c,ci)=>{
