@@ -721,6 +721,77 @@ table.g tbody tr:hover .openb{color:var(--ink2)}
   header{padding:8px 12px 0}
   #topbar{padding:7px 12px}
 }
+
+/* ============================================================
+   The phone, styled as the LOD styles it: soft blocks with a real
+   shadow rather than hairline borders, a header that is itself a
+   card, numbers in the mono face, and a rounded tab bar with the
+   active mark. The colours stay ours.
+   ============================================================ */
+@media (max-width:760px){
+  :root{
+    --m-card:var(--surface2); --m-paper:var(--page1); --m-chip:var(--chip);
+    --m-line:rgba(255,255,255,.06); --m-edge:rgba(255,255,255,.14);
+    --m-ink:var(--ink); --m-ink2:var(--ink2); --m-ink3:var(--ink3);
+    --m-accent:var(--accent); --m-accent-soft:rgba(59,108,246,.16);
+    --m-shadow:0 10px 26px rgba(0,0,0,.45),0 2px 6px rgba(0,0,0,.35);
+  }
+  body{background:var(--m-paper)}
+  /* the header is a block, not a rule */
+  #topbar{background:var(--m-card);border:0;border-radius:0 0 22px 22px;
+    box-shadow:var(--m-shadow);padding:calc(env(safe-area-inset-top) + 10px) 16px 14px;
+    margin-bottom:12px;height:auto;flex-wrap:wrap;gap:10px}
+  #topbar .brand b,#topbar .title{font-size:21px;font-weight:750;letter-spacing:-.03em;
+    color:var(--m-ink);line-height:1.15}
+  #topbar .sub,#topbar .brand small{font-size:12.5px;font-weight:600;color:var(--m-accent);
+    margin-top:2px;text-transform:none}
+  /* the project chips and register tabs as soft blocks */
+  .proj{background:var(--m-card);border:0;border-radius:16px;box-shadow:var(--m-shadow);
+    padding:11px 14px}
+  .proj.on{box-shadow:var(--m-shadow),0 0 0 2px var(--m-accent)}
+  #tabs{gap:6px;padding:2px 0 4px}
+  .tab{background:var(--m-card);border:0;border-radius:13px;box-shadow:var(--m-shadow);
+    color:var(--m-ink3);font-weight:650;padding:9px 12px}
+  .tab.on{color:var(--m-ink);box-shadow:var(--m-shadow),0 0 0 2px var(--m-accent)}
+  .tab .n{background:var(--m-chip);color:var(--m-ink2);border-radius:9px}
+  /* the record cards */
+  .mcard{background:var(--m-card);border:0;border-radius:18px;box-shadow:var(--m-shadow);
+    padding:14px 16px}
+  .mcard.late{box-shadow:var(--m-shadow),inset 3px 0 0 var(--critical)}
+  .mtitle2{font-size:14.5px;font-weight:600;letter-spacing:-.01em}
+  .mref{font-family:var(--mono);font-size:10.5px;letter-spacing:-.02em}
+  .mdates{border-top:1px solid var(--m-line)}
+  .mdates span{font-variant-numeric:tabular-nums}
+  /* figures in the mono face, as the LOD sets them */
+  .kpi,.dsec,.panel{background:var(--m-card);border:0;border-radius:18px;
+    box-shadow:var(--m-shadow);padding:16px}
+  .kpi .v,.dn,.hstat .hn{font-family:var(--mono);letter-spacing:-.035em}
+  .dhead h3,.panel h3,.kpi .k{font-size:9.5px;font-weight:700;letter-spacing:.11em;
+    text-transform:uppercase;color:var(--m-ink3)}
+  /* fields and buttons */
+  .f,input,select,textarea{background:var(--m-chip);border-color:var(--m-line);
+    border-radius:12px;color:var(--m-ink)}
+  .f:focus,input:focus,select:focus,textarea:focus{outline:none;border-color:var(--m-accent);
+    box-shadow:0 0 0 3px var(--m-accent-soft)}
+  .btn{background:var(--m-card);border:0;box-shadow:var(--m-shadow);border-radius:12px;
+    color:var(--m-ink2);padding:9px 13px}
+  .btn.on,.btn.primary{background:var(--m-accent);color:#fff;box-shadow:var(--m-shadow)}
+  /* the tab bar along the bottom */
+  #mtabs{background:var(--m-card);border:0;border-radius:22px 22px 0 0;
+    box-shadow:0 -10px 30px rgba(0,0,0,.45);padding-bottom:env(safe-area-inset-bottom)}
+  #mtabs button{position:relative;color:var(--m-ink3);font-size:9.5px;font-weight:650;
+    letter-spacing:.05em;text-transform:uppercase;padding:10px 2px 11px}
+  #mtabs button.on{color:var(--m-accent)}
+  #mtabs button.on::before{content:"";position:absolute;top:6px;left:50%;
+    transform:translateX(-50%);width:24px;height:3px;border-radius:3px;background:var(--m-accent)}
+  /* the record sheet and the hold menu, same family */
+  .sheet{background:var(--m-paper)}
+  .sheet .sh{background:var(--m-card);border:0;border-radius:0 0 22px 22px;
+    box-shadow:var(--m-shadow)}
+  .fld input,.fld select,.fld textarea{background:var(--m-chip)}
+  .msheetcard{background:var(--m-card);border-radius:22px 22px 0 0}
+  .statusbar,#statusline{background:var(--m-card);border:0}
+}
 </style>
 <script>
 (()=>{ let t=null; try{ t=localStorage.getItem('eng_theme'); }catch(e){}
@@ -775,7 +846,7 @@ table.g tbody tr:hover .openb{color:var(--ink2)}
 <script>
 const SB_URL='https://ivmmnsjiekhjxkhllncb.supabase.co';
 const SB_KEY='sb_publishable_RTHsaxZXVmRBQziLbFJX8g_PAaZzIbF';
-const BUILD='ENG 2026-09-06 · e50';
+const BUILD='ENG 2026-09-06 · e51';
 
 let SESSION=null, ME=null;
 let PROJECTS=[], PEOPLE=[], AB=[], SD=[], GIS=[], HIST=[], INV=[];
