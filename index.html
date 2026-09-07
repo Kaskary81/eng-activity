@@ -115,8 +115,7 @@ h1 small{display:block;font-size:10.5px;font-weight:700;letter-spacing:.1em;
 /* kpis */
 .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;padding:14px 0 4px}
 .kpi{background:linear-gradient(180deg,var(--chip),var(--card2));
-  border:1px solid rgba(42,120,214,.16);border-radius:14px;padding:12px 14px;
-  animation:rise .45s var(--ease) both}
+  border:1px solid rgba(42,120,214,.16);border-radius:14px;padding:12px 14px;}
 @keyframes rise{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
 .kpi .k{font-size:9.5px;font-weight:750;letter-spacing:.1em;text-transform:uppercase;color:var(--ink3)}
 .kpi .v{font-size:25px;font-weight:700;margin:3px 0 2px;letter-spacing:-.02em;
@@ -143,7 +142,7 @@ table.g th{position:sticky;top:0;z-index:4;text-align:left;padding:6px 8px;font-
 table.g th:hover{color:var(--accent)}
 table.g td{border-right:1px solid var(--grid);border-bottom:1px solid var(--grid);padding:4px 7px;text-align:left;vertical-align:top;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;background:var(--surface)}
 table.g tbody tr{animation:none}
-table.g.fresh tbody tr{animation:rise .35s var(--ease) both}
+table.g.fresh tbody tr{}
 table.g tbody tr:nth-child(even) td{background:var(--card2)}
 table.g tbody tr:hover td{background:var(--chip)}
 td.mono{font-family:var(--mono);color:var(--ink)}
@@ -153,7 +152,7 @@ td.wrapc{white-space:normal;line-height:1.45;unicode-bidi:plaintext}
 .dot{width:7px;height:7px;border-radius:50%;flex:none}
 
 .empty{text-align:center;padding:64px 20px;color:var(--ink3)}
-.empty .big{font-size:42px;margin-bottom:10px;animation:float 3.4s ease-in-out infinite}
+.empty .big{font-size:42px;margin-bottom:10px;}
 @keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}
 .empty b{display:block;color:var(--ink);font-size:16px;margin-bottom:6px}
 
@@ -180,7 +179,7 @@ td.wrapc{white-space:normal;line-height:1.45;unicode-bidi:plaintext}
 #login.on{display:grid}
 #login .box{width:min(400px,100%);border:1px solid rgba(42,120,214,.25);border-radius:22px;padding:30px;
   background:linear-gradient(180deg,var(--surface),var(--surface));
-  box-shadow:0 30px 90px rgba(42,120,214,.18);animation:rise .5s var(--ease)}
+  box-shadow:0 30px 90px rgba(42,120,214,.18);}
 #login h2{margin:0 0 5px;font-size:21px}
 #login p{margin:0 0 20px;color:var(--ink3);font-size:13px}
 #login .f{width:100%;margin-bottom:10px}
@@ -226,7 +225,7 @@ td.wrapc{white-space:normal;line-height:1.45;unicode-bidi:plaintext}
 #msg.on{display:grid}
 .mbox{width:min(420px,100%);border:1px solid rgba(42,120,214,.25);border-radius:18px;padding:22px;
   background:linear-gradient(180deg,var(--surface),var(--surface));
-  box-shadow:0 30px 80px rgba(15,20,30,.16);animation:rise .35s var(--ease)}
+  box-shadow:0 30px 80px rgba(15,20,30,.16);}
 .mbox h4{margin:0 0 12px;font-size:16px}
 .macts{display:flex;gap:8px;justify-content:flex-end;margin-top:16px}
 .dfl label{display:block;font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;
@@ -296,7 +295,7 @@ table.daily tr.td-today td{background:var(--chip)}
 /* ---------- cards used by Plan, Overdue and More ---------- */
 .cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:10px;padding:4px 0}
 .lcard{background:var(--card);border:1px solid var(--line);border-left:3px solid var(--line2);
-  border-radius:13px;padding:12px 14px;cursor:pointer;animation:rise .4s var(--ease) both;
+  border-radius:13px;padding:12px 14px;cursor:pointer;
   transition:transform .2s var(--ease),border-color .2s,box-shadow .2s}
 .lcard:hover{transform:translateY(-2px);border-color:var(--line2);box-shadow:var(--shadow)}
 .lcard.ok{border-left-color:var(--good)} .lcard.bad{border-left-color:var(--hot)}
@@ -900,6 +899,16 @@ body.breaking,body.breaking *{user-select:none!important;-webkit-user-select:non
   overflow:hidden;pointer-events:none}
 .shatter .sedge{z-index:0}
 .shatter .sface{z-index:1}
+
+/* Nothing animates on a redraw. The only movement left is the physics of a
+   card being broken, and menus opening — both are things the person started. */
+.wrap *,#gwrap *,.mkpi *,.dsec *,.panel *,.mlist *{animation:none!important}
+.wrap *,#gwrap *,.mkpi *,.dsec *,.panel *,.mlist *{
+  transition-property:background-color,border-color,color,opacity,box-shadow!important;
+  transition-duration:.12s!important}
+/* the pieces of a broken card must still move */
+.shatter,.shatter *{animation:revert!important;transition:filter .12s linear!important}
+.mcard.remade,.mkpi .kpi.remade{animation:remade .26s var(--spring) both!important}
 </style>
 <script>
 (()=>{ let t=null; try{ t=localStorage.getItem('eng_theme'); }catch(e){}
@@ -957,7 +966,7 @@ body.breaking,body.breaking *{user-select:none!important;-webkit-user-select:non
 <script>
 const SB_URL='https://ivmmnsjiekhjxkhllncb.supabase.co';
 const SB_KEY='sb_publishable_RTHsaxZXVmRBQziLbFJX8g_PAaZzIbF';
-const BUILD='ENG 2026-09-06 · e74';
+const BUILD='ENG 2026-09-06 · e75';
 
 let SESSION=null, ME=null;
 let PROJECTS=[], PEOPLE=[], AB=[], SD=[], GIS=[], HIST=[], INV=[];
@@ -3238,7 +3247,7 @@ function paintTable(){
   ANIMATE=(sig!==_lastSig); _lastSig=sig;
   if(CUR.r>rows.length-1)CUR={r:0,c:0};
   $wrap().innerHTML=`<div id="gwrap" tabindex="0" class="${WRAPCELLS?'wrapcells':''}">
-    <table class="g${ANIMATE?' fresh':''}"><thead><tr>
+    <table class="g"><thead><tr>
       <th class="pickcol"><input type="checkbox" id="pickall" title="Tick every row shown"
         ${rows.length&&rows.every(r=>PICKED.has(r.id))?'checked':''}></th>
       <th class="opencol"></th>
@@ -3249,7 +3258,7 @@ function paintTable(){
         (CFILT[c.k]&&CFILT[c.k].length)?' <i class="fmark">▼</i>':''}${
         SORT.k===c.k?(SORT.dir>0?' ▲':' ▼'):''}</th>`).join('')}</tr></thead>
     <tbody>${rows.map((r,ri)=>`<tr data-id="${r.id}" data-row="${ri}"
-      class="${PICKED.has(r.id)?'picked':''}"${ANIMATE?` style="animation-delay:${Math.min(ri,16)*22}ms"`:''}>
+      class="${PICKED.has(r.id)?'picked':''}">
       <td class="pickcol"><input type="checkbox" class="rowpick" data-pick="${r.id}"
         ${PICKED.has(r.id)?'checked':''}></td>
       <td class="opencol"><button class="openb" data-open="${r.id}"
