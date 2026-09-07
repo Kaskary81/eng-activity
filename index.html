@@ -921,7 +921,7 @@ body.breaking,body.breaking *{user-select:none!important;-webkit-user-select:non
   <div class="box">
     <h2>Engineering Activity</h2>
     <p>As-builts, shop drawings, GIS and invoices across the projects.</p>
-    <select class="f" id="lname"><option value="">Loading names…</option></select>
+    <select class="f" id="lname" autocomplete="off"><option value="">Loading names…</option></select>
     <input class="f" id="lpw" type="password" placeholder="Password" autocomplete="current-password">
     <button class="btn on" id="lgo">Sign in</button>
     <div id="lerr"></div>
@@ -966,7 +966,7 @@ body.breaking,body.breaking *{user-select:none!important;-webkit-user-select:non
 <script>
 const SB_URL='https://ivmmnsjiekhjxkhllncb.supabase.co';
 const SB_KEY='sb_publishable_RTHsaxZXVmRBQziLbFJX8g_PAaZzIbF';
-const BUILD='ENG 2026-09-06 · e75';
+const BUILD='ENG 2026-09-07 · e76';
 
 let SESSION=null, ME=null;
 let PROJECTS=[], PEOPLE=[], AB=[], SD=[], GIS=[], HIST=[], INV=[];
@@ -4125,8 +4125,7 @@ async function loadDirectory(){
     if(!Array.isArray(DIR)||!DIR.length)throw new Error('empty');
     sel.innerHTML='<option value="">Choose your name…</option>'+
       DIR.map((d,i)=>`<option value="${i}">${esc(d.name)}</option>`).join('');
-    let last=null;try{last=localStorage.getItem('eng-who');}catch(e){}
-    if(last!==null&&DIR[last])sel.value=last;
+    sel.value='';
   }catch(e){
     sel.innerHTML='<option value="">Could not load the name list</option>';
   }
@@ -4145,7 +4144,7 @@ $('lgo').onclick=async()=>{
     const d=await r.json();
     if(!r.ok)throw new Error(d.error_description||d.msg||'Could not open the tracker');
     SESSION=d;save();
-    try{localStorage.setItem('eng-who',i);}catch(e){}
+    try{localStorage.removeItem('eng-who');}catch(e){}
     await loadAll();
     if(!ME)throw new Error('That name is not on this tracker yet.');
     start();
