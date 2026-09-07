@@ -957,7 +957,7 @@ body.breaking,body.breaking *{user-select:none!important;-webkit-user-select:non
 <script>
 const SB_URL='https://ivmmnsjiekhjxkhllncb.supabase.co';
 const SB_KEY='sb_publishable_RTHsaxZXVmRBQziLbFJX8g_PAaZzIbF';
-const BUILD='ENG 2026-09-06 · e72';
+const BUILD='ENG 2026-09-06 · e74';
 
 let SESSION=null, ME=null;
 let PROJECTS=[], PEOPLE=[], AB=[], SD=[], GIS=[], HIST=[], INV=[];
@@ -1176,14 +1176,6 @@ const COLS={
   ],
 };
 function rowsNow(){
-  /* a card on the dashboard filters the register to that state */
-  if(RSTATE){
-    const sp=regSplit(TAB).rows.find(x=>x.k===RSTATE);
-    if(sp){ const base=rowsOf(TAB), seen=new Set();
-      const order=regSplit(TAB).rows;
-      return base.filter(r=>{ for(const x of order){ if(!seen.has(r.id)&&x.f(r)){ seen.add(r.id);
-        return x.k===RSTATE; } } return false; }); }
-  }
   let rows = TAB==='gis'?gisFor()
            : TAB==='shop'?sdFor() : TAB==='invoice'?invFor() : abFor();
   /* the column filters set from the right-click menu */
@@ -1193,6 +1185,17 @@ function rowsNow(){
     const c=_fc.find(x=>x.k===k); if(!c)return;
     rows=rows.filter(r=>set.includes(cellText(r,c)));
   });
+  /* a state picked on the dashboard narrows whatever is left — it used to be
+     applied first and on its own, which is why clicking one discipline's
+     colour came back with every discipline in it */
+  if(RSTATE){
+    const order=regSplit(TAB).rows;
+    const seen=new Set();
+    rows=rows.filter(r=>{
+      for(const x of order){ if(!seen.has(r.id)&&x.f(r)){ seen.add(r.id); return x.k===RSTATE; } }
+      return false;
+    });
+  }
   if(F==='open'){
     rows = TAB==='invoice'  ? rows.filter(r=>r.status!=='Submitted')
          : TAB==='asbuilts' ? rows.filter(r=>!AB_DONE(r.status))
@@ -3739,7 +3742,22 @@ function wireCells(){
 }
 
 function wireRegCards(){
-  document.querySelectorAll('[data-rstate]').forEach(el=>{
+  /* a piece of a discipline row means BOTH that discipline and that state —
+     filtering by the state alone brought back every discipline */
+  document.querySelectorAll('[data-group]').forEach(el=>{
+    el.style.cursor='pointer';
+    el.onclick=e=>{
+      e.stopPropagation();
+      const f=el.dataset.field, g=el.dataset.group;
+      if(f&&g){
+        if(g==='(not set)')delete CFILT[f]; else CFILT[f]=[g];
+        saveCFilt();
+      }
+      RSTATE = el.dataset.rstate || '';
+      VIEW='reg'; paint();
+    };
+  });
+  document.querySelectorAll('[data-rstate]:not([data-group])').forEach(el=>{
     el.style.cursor='pointer';
     el.onclick=()=>{ RSTATE=(RSTATE===el.dataset.rstate)?'':el.dataset.rstate;
       VIEW='reg'; paint(); };
@@ -4004,10 +4022,12 @@ function discSection(field,title,states){
       const parts=states.map(st=>({st,v:rows.filter(r=>stateOf(r)===st).length})).filter(p=>p.v);
       const done=rows.filter(r=>stateOf(r)===states[0]).length;
       return `<div class="drow">
-        <div class="dlab" title="${esc(g.k)}">${esc(g.k)}</div>
+        <div class="dlab" title="${esc(g.k)} — tap for just this one"
+          data-field="${esc(field)}" data-group="${esc(g.k)}">${esc(g.k)}</div>
         <div class="dtrack" style="width:${g.n/max*100}%">
           ${parts.map(p=>`<i style="flex:${p.v};background:${p.st.c}"
-             data-rstate="${esc(p.st.k)}" title="${esc(p.st.t)} — ${p.v}"></i>`).join('')}
+             data-rstate="${esc(p.st.k)}" data-field="${esc(field)}" data-group="${esc(g.k)}"
+             title="${esc(g.k)} · ${esc(p.st.t)} — ${p.v}"></i>`).join('')}
         </div>
         <div class="dn">${g.n}</div>
         <div class="dp">${Math.round(done/g.n*100)}%</div></div>`;}).join('')}
