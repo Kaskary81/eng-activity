@@ -966,7 +966,7 @@ body.breaking,body.breaking *{user-select:none!important;-webkit-user-select:non
 <script>
 const SB_URL='https://ivmmnsjiekhjxkhllncb.supabase.co';
 const SB_KEY='sb_publishable_RTHsaxZXVmRBQziLbFJX8g_PAaZzIbF';
-const BUILD='ENG 2026-09-08 · e83';
+const BUILD='ENG 2026-09-08 · e84';
 
 let SESSION=null, ME=null;
 let PROJECTS=[], PEOPLE=[], AB=[], SD=[], GIS=[], HIST=[], INV=[];
@@ -1946,8 +1946,18 @@ function paintKpis(){
     cards.push(tile('As-builts submitted', Math.round(abDone/ab.length*100)+'%',
       abDone+' of '+ab.length,'var(--good)', abDone/ab.length*100,
       'asbuilts|done|Submitted as-builts'));
-    if(ab.length-abDone)cards.push(tile('Not submitted', ab.length-abDone,'as-built drawings',
-      'var(--hot)',(ab.length-abDone)/ab.length*100,'asbuilts|open|As-builts not submitted'));
+    /* This tile used to read "Not submitted", which was simply untrue: on
+       Dammam 2 all 17 had been submitted, reviewed and returned by ILF. The
+       tile now carries the workbook's own Status wording for whatever is
+       actually outstanding — "Revise & Resubmit", "Under Review", or both
+       where a project has a mix — so it says the same thing as the source. */
+    const abOpen=ab.filter(r=>!AB_DONE(r.status));
+    if(abOpen.length){
+      const words=[...new Set(abOpen.map(r=>r.status).filter(Boolean))].sort();
+      cards.push(tile(words.join(' · ')||'Outstanding', abOpen.length,'as-built drawings',
+        SC(words.length===1?words[0]:'Revise & Resubmit'),
+        abOpen.length/ab.length*100,'asbuilts|open|'+(words.join(' · ')||'Outstanding')));
+    }
   }
   if(sd.length){
     cards.push(tile('Shop drawings approved', sdOk+' of '+sd.length,'submittals','var(--good)',
