@@ -506,7 +506,37 @@ table.g th.dropR{box-shadow:inset -3px 0 0 var(--accent)}
 .frrow .frold{color:var(--ink2);text-decoration:line-through}
 .frrow .frnew{color:var(--good);font-weight:600}
 
+/* ---- plans ---- */
+.ptbl{width:100%;border-collapse:collapse;font-size:13px}
+.ptbl th,.ptbl td{padding:7px 9px;border-bottom:1px solid var(--line);text-align:left;
+  vertical-align:top}
+.ptbl th{position:sticky;top:0;background:var(--card);font-size:11px;letter-spacing:.4px;
+  text-transform:uppercase;color:var(--ink3);z-index:1}
+.ptbl td.n,.ptbl th.n{text-align:right;font-variant-numeric:tabular-nums}
+.ptbl tbody tr{cursor:pointer}
+.ptbl tbody tr:hover{background:var(--hover)}
+.ptbl .mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px}
+.tblwrap{overflow:auto;border:1px solid var(--line);border-radius:10px;background:var(--card);
+  margin-top:12px;max-height:calc(100vh - 300px)}
+.ptrack{display:flex;height:8px;border-radius:99px;overflow:hidden;background:var(--line)}
+.ptrack i{display:block;height:100%}
+.pklist{margin-top:10px;max-height:52vh;overflow:auto;border:1px solid var(--line);
+  border-radius:10px}
+.pkrow{display:flex;gap:9px;align-items:center;padding:7px 10px;
+  border-bottom:1px solid var(--line);cursor:pointer;font-size:13px}
+.pkrow:hover{background:var(--hover)}
+.pkrow b{min-width:150px}
+.pkd{flex:1;color:var(--ink2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pks{color:var(--ink3);font-size:12px;white-space:nowrap}
+.f2{display:block;margin-top:9px;font-size:12px;color:var(--ink3)}
+.f2 .f{margin-top:4px}
+.pdrop{opacity:.5}
+.pdrop:hover{opacity:1;color:var(--hot)}
 @media print{
+  #printroot .rfoot{margin-top:8pt;padding-top:4pt;border-top:.4pt solid #999;
+    font-size:6.6pt;text-align:center}
+  #printroot .rtbl td.n,#printroot .rtbl th.n{text-align:right}
+
   @page{size:A4 landscape;margin:9mm 8mm}
   /* nothing on screen belongs on paper except the report itself */
   body>*{display:none!important}
@@ -966,7 +996,7 @@ body.breaking,body.breaking *{user-select:none!important;-webkit-user-select:non
 <script>
 const SB_URL='https://ivmmnsjiekhjxkhllncb.supabase.co';
 const SB_KEY='sb_publishable_RTHsaxZXVmRBQziLbFJX8g_PAaZzIbF';
-const BUILD='ENG 2026-09-08 · e84';
+const BUILD='ENG 2026-09-08 · e85';
 
 let SESSION=null, ME=null;
 let PROJECTS=[], PEOPLE=[], AB=[], SD=[], GIS=[], HIST=[], INV=[];
@@ -1049,6 +1079,7 @@ async function loadAll(){
   PROJECTS=pr||[];PEOPLE=pe||[];AB=ab||[];SD=sd||[];GIS=gi||[];
   ME=(me&&me[0])||null; HIST=hs||[]; INV=iv||[];
   applyDeemed();
+  await loadPlans();
 }
 
 /* THE DEEMING RULE — the same one the LOD tracker applies (v118).
@@ -1755,52 +1786,330 @@ function weekStart(off){
   d.setDate(d.getDate()-((d.getDay()+1)%7)+off*7);   /* weeks run Sunday to Saturday */
   return isoDay(d);
 }
+/* ============================================================
+   PLANS — weekly commitments, the overall picture, and the reports.
+   Built to the same shape as the LOD tracker: a plan is one week's committed
+   work; each item carries its OWN target date and owner, so an as-built (which
+   has no planned_date of its own) can be planned like anything else. The
+   "overall" view is the same analysis run across every plan.
+   ============================================================ */
+let PLANS=[], PITEMS={}, PLAN_CUR=null, PLAN_MODE='week';
+
+const REGNAME={asbuilts:'As-built',shop:'Shop drawing',gis:'GIS'};
+const regList=reg=>reg==='shop'?SD:reg==='gis'?GIS:AB;
+const planRow=it=>regList(it.reg).find(r=>r.id===it.record_id)||null;
+const planName=r=>r?(r.submittal_no||r.doc_no||r.description||('#'+r.id)):'';
+const planStatus=r=>r?(r.review_status||r.status||''):'';
+function weekEnd(ws){const d=new Date(ws+'T00:00:00');d.setDate(d.getDate()+6);return isoDay(d);}
+function weekLabel(ws){const f=d=>new Date(d+'T00:00:00')
+  .toLocaleDateString('en-GB',{day:'numeric',month:'short'});
+  return f(ws)+' – '+f(weekEnd(ws))+' '+new Date(ws+'T00:00:00').getFullYear();}
+
+/* What happened to one planned item. Sent before its target is on time; sent
+   after it is late; not sent and the target has passed is overdue. */
+function planItemState(it){
+  const r=planRow(it); if(!r)return {k:'gone',t:'record deleted'};
+  const target=it.planned_date||r.planned_date||'';
+  const sent=r.submitted_date||'';
+  if(sent&&target&&sent<=target)return {k:'on',  t:'On time'};
+  if(sent)                      return {k:'late',t:'Late'};
+  if(target&&target<today)      return {k:'over',t:'Overdue'};
+  return {k:'todo',t:'To come'};
+}
+const PSTATE={on:{t:'On time',c:'#0f9d58'},late:{t:'Late',c:'#6fc38a'},
+  over:{t:'Overdue',c:'#d64545'},todo:{t:'To come',c:'var(--ink3)'},
+  gone:{t:'Record deleted',c:'var(--chip)'}};
+function planTally(items){
+  const t={on:0,late:0,over:0,todo:0,gone:0};
+  items.forEach(it=>t[planItemState(it).k]++);
+  t.total=items.length; t.done=t.on+t.late;
+  t.pct=t.total?Math.round(t.done/t.total*100):0;
+  return t;
+}
+const plansForWeek=ws=>PLANS.filter(p=>p.week_start===ws&&(!PROJ||!p.project_id||p.project_id===PROJ));
+const itemsOf=id=>PITEMS[id]||[];
+
+async function loadPlans(){
+  const [pl,pi]=await Promise.all([
+    apiAll('eng_plans?deleted_at=is.null&order=week_start.desc'),
+    apiAll('eng_plan_items?order=id.asc')]);
+  PLANS=pl||[]; PITEMS={};
+  (pi||[]).forEach(it=>{(PITEMS[it.plan_id]=PITEMS[it.plan_id]||[]).push(it);});
+}
+
+/* ---------- the Plan view ---------- */
 function paintPlan(){
-  const from=weekStart(WEEK), to=(()=>{const d=new Date(from+'T00:00:00');
-    d.setDate(d.getDate()+6);return isoDay(d);})();
-  const inWeek=r=>r.planned_date>=from&&r.planned_date<=to;
-  const items=[...sdFor().filter(r=>r.planned_date&&inWeek(r)).map(r=>({...r,kind:'Shop drawing',tab:'shop'})),
-               ...gisFor().filter(r=>r.planned_date&&inWeek(r)).map(r=>({...r,kind:'GIS',tab:'gis'}))]
-    .sort((a,b)=>a.planned_date<b.planned_date?-1:1);
-  const done=items.filter(r=>r.submitted_date&&r.submitted_date<=to).length;
-  const late=items.filter(r=>!r.submitted_date&&r.planned_date<today).length;
-  const pct=items.length?Math.round(done/items.length*100):0;
-  const fmt=d=>new Date(d+'T00:00:00').toLocaleDateString('en-GB',{day:'numeric',month:'short'});
+  if(PLAN_MODE==='overall')return paintPlanOverall();
+  const ws=weekStart(WEEK), list=plansForWeek(ws);
+  if(!list.some(p=>p.id===PLAN_CUR))PLAN_CUR=list.length?list[0].id:null;
+  const plan=PLANS.find(p=>p.id===PLAN_CUR)||null;
+  const items=plan?itemsOf(plan.id):[];
+  const t=planTally(items);
+  const w=n=>t.total?(n/t.total*100):0;
   $wrap().innerHTML=`
     <div class="planbar">
       <button class="btn" id="wprev">‹</button>
-      <div class="wk"><b>${fmt(from)} – ${fmt(to)}</b>
+      <div class="wk"><b>${esc(weekLabel(ws))}</b>
         <span>${WEEK===0?'this week':WEEK===1?'next week':WEEK===-1?'last week'
           :(WEEK>0?WEEK+' weeks ahead':(-WEEK)+' weeks back')}</span></div>
       <button class="btn" id="wnext">›</button>
       <button class="btn" id="wnow">Today</button>
+      <span style="flex:1"></span>
+      ${list.length>1?`<select class="f" id="planpick" style="max-width:220px">${
+        list.map(p=>`<option value="${p.id}"${p.id===PLAN_CUR?' selected':''}>${
+          esc(p.name||'Plan '+p.id)}</option>`).join('')}</select>`:''}
+      <button class="btn" id="plannew">New plan</button>
+      ${plan?`<button class="btn" id="planadd">Add records</button>`:''}
+      <button class="btn" id="planall">Overall</button>
+      ${plan&&items.length?`<button class="btn" id="planpdf">Report</button>
+        <button class="btn" id="plancsv">CSV</button>`:''}
     </div>
-    <div class="planprog"><div class="pnum"><b>${pct}%</b>
-        <span>${done} of ${items.length} sent</span></div>
-      <div class="ptrack"><i style="width:${pct}%"></i></div>
-      <div class="pleg"><span class="g">${done} sent</span>
-        <span class="r">${late} overdue</span>
-        <span class="n">${items.length-done-late} still to come</span></div></div>
-    ${items.length?`<div class="cards">${items.map((r,i)=>{
-      const sent=!!r.submitted_date, isLate=!sent&&r.planned_date<today;
-      return `<article class="lcard ${sent?'ok':isLate?'bad':''}" data-go="${r.tab}:${r.id}"
-          style="animation-delay:${Math.min(i,14)*24}ms">
-        <div class="lc-top"><span class="tagk">${esc(r.kind)}</span>
-          <b>${esc(r.submittal_no||r.description)}</b>
-          <span class="${sent?'ok':isLate?'late':'due'}">${
-            sent?'sent '+esc(r.submitted_date):isLate?daysLate(r.planned_date)+'d late':'due '+esc(r.planned_date)}</span></div>
-        <div class="lc-what">${esc(r.description||'')}</div>
-        <div class="lc-meta">${esc(projName(r.project_id))} · ${esc(r.review_status)}</div>
-      </article>`;}).join('')}</div>`
-    :`<div class="empty"><div class="big">📅</div><b>Nothing planned for this week</b>
-      Planned dates come from the drawings themselves — set one and it appears here.</div>`}`;
+    ${!plan?`<div class="empty"><div class="big">🗓</div><b>No plan for this week</b>
+        A plan is the work committed for the week. Create one, then add records to it.</div>`
+    :`<div class="planprog">
+        <div class="pnum"><b>${t.total?t.pct+'%':'—'}</b>
+          <span>${t.done} of ${t.total} submitted</span></div>
+        <div class="ptrack">
+          <i style="width:${w(t.on)}%;background:${PSTATE.on.c}"></i>
+          <i style="width:${w(t.late)}%;background:${PSTATE.late.c}"></i>
+          <i style="width:${w(t.over)}%;background:${PSTATE.over.c}"></i></div>
+        <div class="pleg">
+          <span class="g">${t.on} on time</span><span class="g">${t.late} late</span>
+          <span class="r">${t.over} overdue</span><span class="n">${t.todo} to come</span></div>
+      </div>
+      ${items.length?`<div class="tblwrap"><table class="ptbl"><thead><tr>
+          <th>#</th><th>Register</th><th>Reference</th><th>Description</th>
+          <th>Discipline</th><th>Owner</th><th>Target</th><th>Status</th><th>Progress</th><th></th>
+        </tr></thead><tbody>${items.map((it,i)=>{
+          const r=planRow(it), st=planItemState(it), ps=PSTATE[st.k];
+          return `<tr data-go="${esc(it.reg)}:${it.record_id}">
+            <td>${i+1}</td><td>${esc(REGNAME[it.reg]||it.reg)}</td>
+            <td class="mono">${esc(planName(r))}</td>
+            <td>${esc((r&&r.description)||'')}</td>
+            <td>${esc((r&&r.discipline)||'')}</td>
+            <td>${esc(personName(it.assignee_id)||'—')}</td>
+            <td>${esc(it.planned_date||(r&&r.planned_date)||'—')}</td>
+            <td>${esc(planStatus(r))}</td>
+            <td><span class="pill" style="background:${ps.c}22;color:${ps.c}">${esc(st.t)}</span></td>
+            <td><button class="iconb pdrop" data-drop="${it.id}" title="Take off the plan">✕</button></td>
+          </tr>`;}).join('')}</tbody></table></div>`
+      :`<div class="empty"><div class="big">＋</div><b>Nothing on this plan yet</b>
+          Use “Add records” to commit work to ${esc(weekLabel(ws))}.</div>`}`}`;
   $('wprev').onclick=()=>{WEEK--;paintPlan();};
   $('wnext').onclick=()=>{WEEK++;paintPlan();};
   $('wnow').onclick=()=>{WEEK=0;paintPlan();};
+  $('planall').onclick=()=>{PLAN_MODE='overall';paintPlan();};
+  const pick=$('planpick'); if(pick)pick.onchange=()=>{PLAN_CUR=+pick.value;paintPlan();};
+  $('plannew').onclick=()=>newPlan(ws);
+  if($('planadd'))$('planadd').onclick=()=>openPlanPicker(plan);
+  if($('planpdf'))$('planpdf').onclick=()=>exportPlanPDF(plan);
+  if($('plancsv'))$('plancsv').onclick=()=>exportPlanCSV(plan);
+  $wrap().querySelectorAll('.pdrop').forEach(b=>b.onclick=async e=>{
+    e.stopPropagation();
+    try{ await api('eng_plan_items?id=eq.'+b.dataset.drop,{method:'DELETE'});
+      await loadPlans(); paintPlan(); toast('Taken off the plan'); }
+    catch(err){ toast(err.message); }});
   $wrap().querySelectorAll('[data-go]').forEach(el=>el.onclick=()=>{
-    const [tab,id]=el.dataset.go.split(':');
-    TAB=tab; VIEW='reg'; paint(); openSheet(+id);});
+    const [reg,id]=el.dataset.go.split(':');
+    TAB=reg; VIEW='reg'; dashReset(); paint(); openSheet(+id);});
 }
+
+async function newPlan(ws){
+  const name=prompt('Name this plan',weekLabel(ws)); if(name===null)return;
+  try{
+    const r=await api('eng_plans',{method:'POST',body:JSON.stringify({
+      week_start:ws,name:name.trim(),project_id:PROJ||null,
+      created_by:(ME&&ME.name)||''})});
+    await loadPlans(); PLAN_CUR=(r&&r[0]&&r[0].id)||null; paintPlan(); toast('Plan created');
+  }catch(e){ toast(e.message); }
+}
+
+/* ---------- choosing what goes on a plan ---------- */
+function openPlanPicker(plan){
+  const already=new Set(itemsOf(plan.id).map(it=>it.reg+':'+it.record_id));
+  const cand=[]; const push=(reg,arr)=>arr.forEach(r=>{
+    if(already.has(reg+':'+r.id))return;
+    if(DONEFN[reg]&&DONEFN[reg](r))return;        /* finished work is not planned */
+    cand.push({reg,r});});
+  push('asbuilts',abFor()); push('shop',sdFor()); push('gis',gisFor());
+  const sh=document.getElementById('sheet');
+  sh.innerHTML=`<div class="sh"><button class="iconb" id="shx">←</button>
+      <b style="flex:1">Add records to ${esc(plan.name||weekLabel(plan.week_start))}</b>
+      <button class="btn" id="pkadd">Add selected</button></div>
+    <div class="sb">
+      <input class="f" id="pkq" placeholder="Filter by reference, description or discipline">
+      <label class="f2">Target date
+        <input class="f" id="pktarget" type="date" value="${esc(weekEnd(plan.week_start))}"></label>
+      <label class="f2">Owner
+        <select class="f" id="pkwho"><option value="">— nobody yet —</option>
+        ${PEOPLE.map(p=>`<option value="${p.id}">${esc(p.name)}</option>`).join('')}</select></label>
+      <div id="pklist" class="pklist"></div>
+    </div>`;
+  const draw=()=>{
+    const q=($('pkq').value||'').toLowerCase();
+    const rows=cand.filter(({r,reg})=>!q||[planName(r),r.description,r.discipline,REGNAME[reg]]
+      .some(v=>String(v||'').toLowerCase().includes(q))).slice(0,400);
+    $('pklist').innerHTML=rows.length?rows.map(({reg,r})=>
+      `<label class="pkrow"><input type="checkbox" data-pk="${reg}:${r.id}">
+        <span class="tagk">${esc(REGNAME[reg])}</span>
+        <b class="mono">${esc(planName(r))}</b>
+        <span class="pkd">${esc(r.description||'')}</span>
+        <span class="pks">${esc(planStatus(r))}</span></label>`).join('')
+      :`<div class="empty"><b>Nothing left to add</b>Everything outstanding is already on a plan or finished.</div>`;
+  };
+  draw();
+  $('pkq').oninput=draw;
+  $('shx').onclick=()=>{sh.innerHTML='';};
+  $('pkadd').onclick=async()=>{
+    const picked=[...sh.querySelectorAll('[data-pk]:checked')].map(b=>b.dataset.pk);
+    if(!picked.length)return toast('Nothing selected');
+    const body=picked.map(k=>{const [reg,id]=k.split(':');
+      return {plan_id:plan.id,reg,record_id:+id,
+        planned_date:$('pktarget').value||'',
+        assignee_id:$('pkwho').value?+$('pkwho').value:null};});
+    try{ await api('eng_plan_items',{method:'POST',body:JSON.stringify(body)});
+      await loadPlans(); sh.innerHTML=''; paintPlan();
+      toast(picked.length+' added to the plan'); }
+    catch(e){ toast(e.message); }
+  };
+}
+
+/* ---------- the overall picture, across every plan ---------- */
+function planUniverse(){
+  const out=[];
+  PLANS.forEach(p=>{ if(PROJ&&p.project_id&&p.project_id!==PROJ)return;
+    itemsOf(p.id).forEach(it=>out.push({it,plan:p,r:planRow(it),st:planItemState(it)}));});
+  return out;
+}
+function planGroup(u,keyOf){
+  const m=new Map();
+  u.forEach(x=>{const k=keyOf(x)||'(not set)';
+    if(!m.has(k))m.set(k,[]); m.get(k).push(x.it);});
+  return [...m.entries()].map(([k,items])=>({k,t:planTally(items)}))
+    .sort((a,b)=>b.t.total-a.t.total);
+}
+function planTable(title,rows){
+  if(!rows.length)return '';
+  return `<div class="dsec"><div class="dhead"><h3>${esc(title)}</h3>
+      <span>${rows.length} group${rows.length===1?'':'s'}</span></div>
+    <div class="tblwrap"><table class="ptbl"><thead><tr><th>${esc(title)}</th>
+      <th class="n">Planned</th><th class="n">On time</th><th class="n">Late</th>
+      <th class="n">Overdue</th><th class="n">To come</th><th class="n">Submitted</th></tr></thead>
+    <tbody>${rows.map(g=>`<tr><td>${esc(g.k)}</td><td class="n">${g.t.total}</td>
+      <td class="n">${g.t.on}</td><td class="n">${g.t.late}</td><td class="n">${g.t.over}</td>
+      <td class="n">${g.t.todo}</td><td class="n">${g.t.total?g.t.pct+'%':'—'}</td></tr>`).join('')}
+    </tbody></table></div></div>`;
+}
+function paintPlanOverall(){
+  const u=planUniverse(), t=planTally(u.map(x=>x.it));
+  const w=n=>t.total?(n/t.total*100):0;
+  const weeks=planGroup(u,x=>weekLabel(x.plan.week_start));
+  $wrap().innerHTML=`
+    <div class="planbar">
+      <button class="btn" id="planweek">‹ Weekly plans</button>
+      <div class="wk"><b>Overall plan</b>
+        <span>${PLANS.length} plan${PLANS.length===1?'':'s'} · ${t.total} record${t.total===1?'':'s'} committed</span></div>
+      <span style="flex:1"></span>
+      ${t.total?`<button class="btn" id="allpdf">Report</button>
+        <button class="btn" id="allcsv">CSV</button>`:''}
+    </div>
+    ${!t.total?`<div class="empty"><div class="big">🗓</div><b>Nothing committed yet</b>
+        Create a weekly plan and add records to it; the overall picture builds itself from those.</div>`
+    :`<div class="planprog">
+        <div class="pnum"><b>${t.pct}%</b><span>${t.done} of ${t.total} submitted</span></div>
+        <div class="ptrack">
+          <i style="width:${w(t.on)}%;background:${PSTATE.on.c}"></i>
+          <i style="width:${w(t.late)}%;background:${PSTATE.late.c}"></i>
+          <i style="width:${w(t.over)}%;background:${PSTATE.over.c}"></i></div>
+        <div class="pleg"><span class="g">${t.on} on time</span><span class="g">${t.late} late</span>
+          <span class="r">${t.over} overdue</span><span class="n">${t.todo} to come</span></div>
+        <div class="dnote">Of everything that has been submitted, ${
+          t.done?Math.round(t.on/t.done*100):0}% went out on or before its target date.</div>
+      </div>
+      ${planTable('Week',weeks)}
+      ${planTable('Register',planGroup(u,x=>REGNAME[x.it.reg]||x.it.reg))}
+      ${planTable('Discipline',planGroup(u,x=>x.r&&x.r.discipline))}
+      ${planTable('Owner',planGroup(u,x=>personName(x.it.assignee_id)))}`}`;
+  $('planweek').onclick=()=>{PLAN_MODE='week';paintPlan();};
+  if($('allpdf'))$('allpdf').onclick=()=>exportPlanPDF(null);
+  if($('allcsv'))$('allcsv').onclick=()=>exportPlanCSV(null);
+}
+
+/* ---------- the reports ----------
+   Plain black on white, ruled table, numbered rows, no colour panels — the
+   same printed shape as the register report already in this app. */
+function planReportRows(plan){
+  return plan ? itemsOf(plan.id).map(it=>({it,plan,r:planRow(it),st:planItemState(it)}))
+              : planUniverse().sort((a,b)=>a.plan.week_start<b.plan.week_start?-1:1);
+}
+function exportPlanPDF(plan){
+  const rows=planReportRows(plan);
+  if(!rows.length)return toast('Nothing on this plan to report');
+  const t=planTally(rows.map(x=>x.it));
+  let root=document.getElementById('printroot');
+  if(!root){root=document.createElement('div');root.id='printroot';document.body.appendChild(root);}
+  const stamp=new Date().toLocaleDateString('en-GB',{day:'2-digit',month:'long',year:'numeric'});
+  const title=plan?'Weekly Submission Plan':'Submission Plan — Overall';
+  const sub=plan?weekLabel(plan.week_start)+(plan.name?' · '+plan.name:'')
+                :PLANS.length+' plans';
+  root.innerHTML=`<div class="rhead">
+      <div><h1>${esc(title)}${PROJ?' — '+esc(projName(PROJ)):''}</h1>
+        <div class="rsub">${esc(sub)}</div></div>
+      <div class="rd">${stamp}<br><span>${t.total} record${t.total===1?'':'s'} · ${t.pct}% submitted</span></div>
+    </div>
+    <table class="rtbl"><thead><tr>
+      <th style="width:4%">#</th>${plan?'':'<th style="width:12%">Week</th>'}
+      <th style="width:9%">Register</th><th style="width:14%">Reference</th>
+      <th style="width:${plan?29:21}%">Description</th><th style="width:8%">Discipline</th>
+      <th style="width:12%">Owner</th><th style="width:8%">Target</th>
+      <th style="width:8%">Progress</th></tr></thead><tbody>
+      ${rows.map((x,i)=>`<tr><td>${i+1}</td>${plan?'':`<td>${esc(weekLabel(x.plan.week_start))}</td>`}
+        <td>${esc(REGNAME[x.it.reg]||x.it.reg)}</td>
+        <td>${esc(planName(x.r))}</td>
+        <td style="text-align:left">${esc((x.r&&x.r.description)||'')}</td>
+        <td>${esc((x.r&&x.r.discipline)||'')}</td>
+        <td style="text-align:left">${esc(personName(x.it.assignee_id)||'—')}</td>
+        <td>${esc(x.it.planned_date||(x.r&&x.r.planned_date)||'—')}</td>
+        <td>${esc(x.st.t)}</td></tr>`).join('')}
+    </tbody></table>
+    <table class="rtbl" style="margin-top:8pt;width:60%"><thead><tr>
+      <th>Summary</th><th class="n">Records</th></tr></thead><tbody>
+      <tr><td style="text-align:left">Planned</td><td>${t.total}</td></tr>
+      <tr><td style="text-align:left">Submitted on time</td><td>${t.on}</td></tr>
+      <tr><td style="text-align:left">Submitted late</td><td>${t.late}</td></tr>
+      <tr><td style="text-align:left">Overdue, not submitted</td><td>${t.over}</td></tr>
+      <tr><td style="text-align:left">Still to come</td><td>${t.todo}</td></tr>
+    </tbody></table>
+    <div class="rfoot">${esc(title)}${PROJ?' — '+esc(projName(PROJ)):''} · ${esc(sub)} · ${stamp}${
+      ME&&ME.name?' · issued by '+esc(ME.name):''}</div>`;
+  document.body.classList.add('printing');
+  const done=()=>{document.body.classList.remove('printing');
+    window.removeEventListener('afterprint',done);};
+  window.addEventListener('afterprint',done);
+  setTimeout(()=>{window.print();setTimeout(done,1500);},60);
+}
+function exportPlanCSV(plan){
+  const rows=planReportRows(plan);
+  if(!rows.length)return toast('Nothing to export');
+  const cell=v=>{const s=String(v??'');
+    return /[",\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s;};
+  const head=['Week','Register','Reference','Description','Discipline','Owner',
+              'Target','Status','Submitted','Progress'];
+  const csv=[head.map(cell).join(',')].concat(rows.map(x=>[
+      weekLabel(x.plan.week_start),REGNAME[x.it.reg]||x.it.reg,planName(x.r),
+      (x.r&&x.r.description)||'',(x.r&&x.r.discipline)||'',
+      personName(x.it.assignee_id)||'',
+      x.it.planned_date||(x.r&&x.r.planned_date)||'',
+      planStatus(x.r),(x.r&&x.r.submitted_date)||'',x.st.t
+    ].map(cell).join(',')).join('\n')).join('\n');
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob(['\ufeff'+csv],{type:'text/csv;charset=utf-8'}));
+  a.download='plan-'+(plan?plan.week_start:'overall')+
+    (PROJ?'-'+(projCode(PROJ)||PROJ):'')+'-'+today+'.csv';
+  a.click();
+  toast(rows.length+' rows exported');
+}
+
 
 /* ---------- More (phone) ---------- */
 function paintMore(){
