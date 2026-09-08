@@ -530,6 +530,11 @@ table.g th.dropR{box-shadow:inset -3px 0 0 var(--accent)}
 .pks{color:var(--ink3);font-size:12px;white-space:nowrap}
 .f2{display:block;margin-top:9px;font-size:12px;color:var(--ink3)}
 .f2 .f{margin-top:4px}
+.ptbl .pin{padding:3px 6px;font-size:12px;min-width:104px;background:transparent;
+  border:1px solid transparent;border-radius:6px}
+.ptbl tr:hover .pin{border-color:var(--line)}
+.ptbl .pin:focus{border-color:var(--acc);background:var(--card)}
+.ptbl .pin.saving{opacity:.5}
 .pdrop{opacity:.5}
 .pdrop:hover{opacity:1;color:var(--hot)}
 @media print{
@@ -996,7 +1001,7 @@ body.breaking,body.breaking *{user-select:none!important;-webkit-user-select:non
 <script>
 const SB_URL='https://ivmmnsjiekhjxkhllncb.supabase.co';
 const SB_KEY='sb_publishable_RTHsaxZXVmRBQziLbFJX8g_PAaZzIbF';
-const BUILD='ENG 2026-09-08 · e85';
+const BUILD='ENG 2026-09-08 · e86';
 
 let SESSION=null, ME=null;
 let PROJECTS=[], PEOPLE=[], AB=[], SD=[], GIS=[], HIST=[], INV=[];
@@ -1887,8 +1892,12 @@ function paintPlan(){
             <td class="mono">${esc(planName(r))}</td>
             <td>${esc((r&&r.description)||'')}</td>
             <td>${esc((r&&r.discipline)||'')}</td>
-            <td>${esc(personName(it.assignee_id)||'—')}</td>
-            <td>${esc(it.planned_date||(r&&r.planned_date)||'—')}</td>
+            <td><select class="f pin" data-who="${it.id}">
+              <option value="">—</option>${PEOPLE.map(p=>
+                `<option value="${p.id}"${p.id===it.assignee_id?' selected':''}>${esc(p.name)}</option>`).join('')}
+            </select></td>
+            <td><input class="f pin" type="date" data-when="${it.id}"
+                 value="${esc(it.planned_date||(r&&r.planned_date)||'')}"></td>
             <td>${esc(planStatus(r))}</td>
             <td><span class="pill" style="background:${ps.c}22;color:${ps.c}">${esc(st.t)}</span></td>
             <td><button class="iconb pdrop" data-drop="${it.id}" title="Take off the plan">✕</button></td>
@@ -1904,6 +1913,22 @@ function paintPlan(){
   if($('planadd'))$('planadd').onclick=()=>openPlanPicker(plan);
   if($('planpdf'))$('planpdf').onclick=()=>exportPlanPDF(plan);
   if($('plancsv'))$('plancsv').onclick=()=>exportPlanCSV(plan);
+  /* The target date and the owner are set here, on the plan, not on the
+     drawing — that is the whole point of planning ahead: a date you are
+     committing to now, for work that has not been submitted yet. */
+  const savePin=async(id,patch,el)=>{
+    el.classList.add('saving');
+    try{ await api('eng_plan_items?id=eq.'+id,{method:'PATCH',body:JSON.stringify(patch)});
+      const it=(PITEMS[PLAN_CUR]||[]).find(x=>x.id===+id); if(it)Object.assign(it,patch);
+      el.classList.remove('saving'); paintPlan(); }
+    catch(err){ el.classList.remove('saving'); toast(err.message); }
+  };
+  $wrap().querySelectorAll('[data-when]').forEach(el=>{
+    el.onclick=e=>e.stopPropagation();
+    el.onchange=()=>savePin(el.dataset.when,{planned_date:el.value||''},el);});
+  $wrap().querySelectorAll('[data-who]').forEach(el=>{
+    el.onclick=e=>e.stopPropagation();
+    el.onchange=()=>savePin(el.dataset.who,{assignee_id:el.value?+el.value:null},el);});
   $wrap().querySelectorAll('.pdrop').forEach(b=>b.onclick=async e=>{
     e.stopPropagation();
     try{ await api('eng_plan_items?id=eq.'+b.dataset.drop,{method:'DELETE'});
@@ -1938,7 +1963,7 @@ function openPlanPicker(plan){
       <button class="btn" id="pkadd">Add selected</button></div>
     <div class="sb">
       <input class="f" id="pkq" placeholder="Filter by reference, description or discipline">
-      <label class="f2">Target date
+      <label class="f2">Target date to start them on — each row can be changed afterwards
         <input class="f" id="pktarget" type="date" value="${esc(weekEnd(plan.week_start))}"></label>
       <label class="f2">Owner
         <select class="f" id="pkwho"><option value="">— nobody yet —</option>
