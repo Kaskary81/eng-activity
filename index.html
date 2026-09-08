@@ -1002,7 +1002,7 @@ body.breaking,body.breaking *{user-select:none!important;-webkit-user-select:non
 <script>
 const SB_URL='https://ivmmnsjiekhjxkhllncb.supabase.co';
 const SB_KEY='sb_publishable_RTHsaxZXVmRBQziLbFJX8g_PAaZzIbF';
-const BUILD='ENG 2026-09-08 · e88';
+const BUILD='ENG 2026-09-08 · e89';
 
 let SESSION=null, ME=null;
 let PROJECTS=[], PEOPLE=[], AB=[], SD=[], GIS=[], HIST=[], INV=[];
@@ -1282,7 +1282,8 @@ const COLS={
   ],
   invoice:[
     {k:'invoice_no',   t:'Invoice',  w:80},
-    {k:'zone',         t:'Zone',     w:130},
+    {k:'part',         t:'Part',     w:70},
+    {k:'zone',         t:'Zone',     w:80},
     {k:'start_manhole',t:'From',     w:170,cls:'mono'},
     {k:'stop_manhole', t:'To',       w:170,cls:'mono'},
     {k:'diameter_mm',  t:'Dia mm',   w:80},
@@ -1398,7 +1399,7 @@ const EDIT={
     ['review_status','Review status','sel',REVIEW],
     ['planned_date','Planned','date'],['submitted_date','Submitted','date'],
     ['received_date','Received','date']],
-  invoice:[['invoice_no','Invoice','text'],['zone','Zone','text'],
+  invoice:[['invoice_no','Invoice','text'],['part','Part','num'],['zone','Zone','text'],
     ['start_manhole','From','text'],
     ['stop_manhole','To','text'],['diameter_mm','Diameter mm','num'],
     ['length_m','Length m','num'],
@@ -1630,7 +1631,7 @@ function exportPDF(){
   const shown=used.length?used:cols;
   /* the widths: the description takes what is left, the short ones stay short */
   const WIDE={description:26,doc_no:15,submittal_no:11,zone:10,discipline:8,review_status:9,
-              backdrop_type:8,start_manhole:12,stop_manhole:12,
+              backdrop_type:8,start_manhole:12,stop_manhole:12,part:5,
               planned_date:7,submitted_date:7,received_date:7,last_revision:4,
               owner_id:8,project_id:10,cycles:4};
   const weights=shown.map(c=>WIDE[c.k]||9);
@@ -2255,7 +2256,7 @@ const NEWROW={
     planned_date:'',submitted_date:'',received_date:''}),
   invoice:()=>({start_manhole:'',stop_manhole:'',diameter_mm:null,length_m:null,
     method:'Open Cut',backdrops:null,backdrop_type:'',yt_connections:null,
-    zone:'',status:'Not Submitted',invoice_no:'',asbuilt_submittal_no:''})};
+    part:null,zone:'',status:'Not Submitted',invoice_no:'',asbuilt_submittal_no:''})};
 
 async function newRecord(){
   if(!canEdit())return toast('You have view-only access');
