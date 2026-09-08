@@ -966,7 +966,7 @@ body.breaking,body.breaking *{user-select:none!important;-webkit-user-select:non
 <script>
 const SB_URL='https://ivmmnsjiekhjxkhllncb.supabase.co';
 const SB_KEY='sb_publishable_RTHsaxZXVmRBQziLbFJX8g_PAaZzIbF';
-const BUILD='ENG 2026-09-07 · e76';
+const BUILD='ENG 2026-09-08 · e77';
 
 let SESSION=null, ME=null;
 let PROJECTS=[], PEOPLE=[], AB=[], SD=[], GIS=[], HIST=[], INV=[];
@@ -1048,6 +1048,53 @@ async function loadAll(){
     apiAll('eng_invoice_sections?deleted_at=is.null&order=id.asc')]);
   PROJECTS=pr||[];PEOPLE=pe||[];AB=ab||[];SD=sd||[];GIS=gi||[];
   ME=(me&&me[0])||null; HIST=hs||[]; INV=iv||[];
+  applyDeemed();
+}
+
+/* THE DEEMING RULE — the same one the LOD tracker applies (v118).
+   An IFI submittal with no Client reply inside 10 working days is deemed
+   acknowledged under the agreed procedure. 'Deemed' was already in this app's
+   vocabulary (MAADEN_CODES, the grade map, the colours) but nothing ever set
+   it, so it could only be typed in by hand.
+
+   COMPUTED ON EVERY LOAD, NEVER WRITTEN TO THE DATABASE. eng_history_sync()
+   is a row trigger on the submission history, and nothing happens in the
+   history on the day a drawing crosses its tenth working day — a stored value
+   would sit stale until somebody touched the record. The stored value is kept
+   in _rs0 so the overlay lifts and recomputes each time, and a real reply
+   arriving later simply takes over.
+
+   Scope follows the data: issue_status is only populated on the Ma'aden
+   records, so the IFI test scopes this to Ar Rjum on its own and will pick up
+   any future Ma'aden project without a change here. IFR is never deemed — it
+   needs a real code. A drawing with no submission date cannot be deemed: a
+   claim against the Client has to rest on a submission we can show. */
+const DEEM_OPEN=['Replied','Under Client review'];
+function workingDays(from,to){
+  if(!from||!to)return null;
+  const a=new Date(from), b=new Date(to);
+  if(isNaN(a)||isNaN(b)||b<a)return null;
+  let n=0; const d=new Date(a);
+  d.setDate(d.getDate()+1);                 /* the day of issue does not count */
+  while(d<=b){ const w=d.getDay(); if(w>=1&&w<=5)n++; d.setDate(d.getDate()+1); }
+  return n;
+}
+function applyDeemed(){
+  for(const r of SD){                       /* lift the previous overlay first */
+    if(r._rs0!==undefined){ r.review_status=r._rs0; delete r._rs0; }
+    r.deemedAuto=false;
+  }
+  let n=0;
+  for(const r of SD){
+    if(r.issue_status!=='IFI')                          continue;
+    if(!DEEM_OPEN.includes(r.review_status||''))        continue;
+    if((r.submitted_date||'').trim()==='')              continue;
+    if((r.received_date||'').trim()!=='')               continue;
+    const used=workingDays(r.submitted_date,today);
+    if(used==null||used<=10)                            continue;
+    r._rs0=r.review_status; r.review_status='Deemed'; r.deemedAuto=true; n++;
+  }
+  return n;
 }
 
 /* ---------- helpers ---------- */
@@ -1076,7 +1123,7 @@ const MAADEN_GRADE={
   'Code B':            {g:'C', t:'Proceed with exceptions', d:'proceed with exceptions to the next submission and revision'},
   'Rejected':          {g:'R', t:'Do not proceed',          d:'revise as noted and resubmit'},
   'Replied':           {g:'I', t:'For information',         d:'issued to the Client for information'},
-  'Deemed':            {g:'A', t:'Deemed accepted',         d:'no reply within 10 working days'},
+  'Deemed':            {g:'A', t:'Deemed acknowledged',     d:'no reply within 10 working days'},
   'Under Client review':{g:'', t:'Under Client review',     d:'with Ma\'aden, awaiting their stamp'},
   'On hold':           {g:'',  t:'On hold',                 d:'held pending a prerequisite'},
   /* the words this app already uses, carrying the Client's own stamp, so a
