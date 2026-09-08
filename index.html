@@ -966,7 +966,7 @@ body.breaking,body.breaking *{user-select:none!important;-webkit-user-select:non
 <script>
 const SB_URL='https://ivmmnsjiekhjxkhllncb.supabase.co';
 const SB_KEY='sb_publishable_RTHsaxZXVmRBQziLbFJX8g_PAaZzIbF';
-const BUILD='ENG 2026-09-08 · e78';
+const BUILD='ENG 2026-09-08 · e79';
 
 let SESSION=null, ME=null;
 let PROJECTS=[], PEOPLE=[], AB=[], SD=[], GIS=[], HIST=[], INV=[];
@@ -1064,9 +1064,13 @@ async function loadAll(){
    in _rs0 so the overlay lifts and recomputes each time, and a real reply
    arriving later simply takes over.
 
-   Scope follows the data: issue_status is only populated on the Ma'aden
-   records, so the IFI test scopes this to Ar Rjum on its own and will pick up
-   any future Ma'aden project without a change here. IFR is never deemed — it
+   THE SCOPE IS MA'ADEN ONLY. This is Ma'aden's procedure, not NWC's, so the
+   rule tests the project's client and not merely whether an Issue value has
+   been filled in. Until e79 the scope was only implied by issue_status being
+   populated on the Ar Rjum records — an "IFI" typed by hand into an NWC
+   drawing would have deemed it against a client who never agreed to the
+   procedure. Add a Ma'aden project and set its client and it is covered here
+   with no further change. IFR is never deemed — it
    needs a real code. A drawing with no submission date cannot be deemed: a
    claim against the Client has to rest on a submission we can show. */
 const DEEM_OPEN=['Replied','Under Client review'];
@@ -1086,6 +1090,7 @@ function applyDeemed(){
   }
   let n=0;
   for(const r of SD){
+    if(clientOf(r.project_id)!=='Maaden')                continue;
     if(r.issue_status!=='IFI')                          continue;
     if(!DEEM_OPEN.includes(r.review_status||''))        continue;
     if((r.submitted_date||'').trim()==='')              continue;
