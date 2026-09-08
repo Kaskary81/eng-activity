@@ -966,7 +966,7 @@ body.breaking,body.breaking *{user-select:none!important;-webkit-user-select:non
 <script>
 const SB_URL='https://ivmmnsjiekhjxkhllncb.supabase.co';
 const SB_KEY='sb_publishable_RTHsaxZXVmRBQziLbFJX8g_PAaZzIbF';
-const BUILD='ENG 2026-09-08 · e77';
+const BUILD='ENG 2026-09-08 · e78';
 
 let SESSION=null, ME=null;
 let PROJECTS=[], PEOPLE=[], AB=[], SD=[], GIS=[], HIST=[], INV=[];
@@ -1107,7 +1107,12 @@ const personName = id => (PEOPLE.find(p=>p.id===id)||{}).name || '';
 const projName   = id => (PROJECTS.find(p=>p.id===id)||{}).name || '—';
 const projCode   = id => (PROJECTS.find(p=>p.id===id)||{}).code || '';
 
-const AB_DONE  = s => s==='Submitted';
+/* The as-built register is a submittal log reviewed by ILF, so "done" means
+   accepted — with or without exceptions — exactly as the shop drawings and GIS
+   registers read it. 'Submitted' is kept so any older pipeline-model record
+   still counts. */
+const AB_DONE  = s => s==='Approved' || s==='Approved As Noted'
+                   || s==='Submitted';
 /* the Client has accepted it, with or without exceptions */
 const GIS_OK   = s => s==='Code A' || s==='Code B' || s==='Deemed'
                    || s==='Approved' || s==='Approved As Noted';
@@ -1146,6 +1151,7 @@ const AWPT_CODES=['RNC','RWC','Awaiting reply','Not submitted'];
 const CLASSES=['IFI','IFR','AWPT-only'];
 
 const SCOL={ 'Submitted':'var(--good)','Notsubmitted':'var(--hot)',
+  'Approved':'#0f9d58','Approved As Noted':'#6fc38a','Revise & Resubmit':'#d64545',
   'Approved':'var(--good)','Approved As Noted':'var(--good)','Under Review':'var(--warn)',
   'Revise & Resubmit':'var(--hot)','Rejected':'var(--hot)','Not Submitted':'var(--ink3)',
   'Open':'var(--warn)','In Progress':'var(--sky)','Resolved':'var(--good)',
@@ -1178,8 +1184,12 @@ const COLS={
     {k:'description', t:'Drawing',   w:330,wrap:1},
     {k:'discipline',  t:'Discipline',w:130},
     {k:'revision',    t:'Rev',       w:60},
-    {k:'status',      t:'Status',   w:120,pill:1},
-    {k:'category',    t:'Category', w:150},
+    {k:'status',      t:'Status',   w:150,pill:1},
+    {k:'submitted_date',t:'Submitted',w:100},
+    {k:'received_date', t:'Approved by ILF',w:130},
+    {k:'days_action', t:'Days',     w:70},
+    {k:'site',        t:'Site',     w:110},
+    {k:'category',    t:'Building', w:150},
     {k:'issue_status',t:'Issue',      w:70},
     {k:'action_by',   t:'With',       w:120},
     {k:'zone',        t:'Zone',     w:90},
@@ -1310,11 +1320,16 @@ Object.defineProperty(window,'REVIEW',{get(){
   if(PROJ)return clientOf(PROJ)==='Maaden'?REVIEW_MAADEN:REVIEW_NWC;
   return [...new Set([...REVIEW_NWC,...REVIEW_MAADEN])];
 }});
+/* ILF's own words, from the as-built workbooks */
+const AB_STATUS=['Approved','Approved As Noted','Revise & Resubmit',
+                 'Under Review','Not Submitted'];
 const EDIT={
   _doc:{doc_no:'text',issue_status:'text',action_by:'text'},
   asbuilts:[['submittal_no','Submittal','text'],['description','Drawing','area'],
     ['discipline','Discipline','text'],['revision','Rev','num'],
-    ['status','Status','sel',['Submitted','Notsubmitted']],
+    ['status','Status','sel',AB_STATUS],
+    ['site','Site','text'],
+    ['submitted_date','Submitted','date'],['received_date','Approved by ILF','date'],
     ['category','Category','text'],['zone','Zone','text'],['comments','Comments','area']],
   shop:[['submittal_no','Submittal','text'],['description','Description','area'],
     ['discipline','Discipline','text'],['zone','Zone','text'],['last_revision','Rev','num'],
@@ -1333,7 +1348,7 @@ const EDIT={
     ['backdrops','Backdrops','num'],['yt_connections','Y/T connections','num'],
     ['asbuilt_submittal_no','As-built submittal no.','text']]
 };
-const DATECOLS={asbuilts:[],shop:[['planned_date','Planned'],['submitted_date','Submitted'],
+const DATECOLS={asbuilts:[['submitted_date','Submitted'],['received_date','Approved by ILF']],shop:[['planned_date','Planned'],['submitted_date','Submitted'],
     ['received_date','Received']],
   gis:[['planned_date','Planned'],['submitted_date','Submitted'],['received_date','Received']]};
 let DF={field:'',from:'',to:''};
@@ -1797,7 +1812,7 @@ function paintMore(){
 const LISTOF={asbuilts:()=>AB,shop:()=>SD,gis:()=>GIS,invoice:()=>INV};
 const NEWROW={
   asbuilts:()=>({submittal_no:'',description:'New as-built drawing',discipline:'',
-    revision:null,status:'Notsubmitted',category:'',zone:'',comments:''}),
+    revision:null,status:'Not Submitted',category:'',site:'',zone:'As-Built',comments:''}),
   shop:()=>({submittal_no:'',description:'New shop drawing',discipline:'',zone:'',
     last_revision:null,review_status:'Not Submitted',
     planned_date:'',submitted_date:'',received_date:''}),
