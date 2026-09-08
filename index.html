@@ -966,7 +966,7 @@ body.breaking,body.breaking *{user-select:none!important;-webkit-user-select:non
 <script>
 const SB_URL='https://ivmmnsjiekhjxkhllncb.supabase.co';
 const SB_KEY='sb_publishable_RTHsaxZXVmRBQziLbFJX8g_PAaZzIbF';
-const BUILD='ENG 2026-09-08 · e81';
+const BUILD='ENG 2026-09-08 · e82';
 
 let SESSION=null, ME=null;
 let PROJECTS=[], PEOPLE=[], AB=[], SD=[], GIS=[], HIST=[], INV=[];
@@ -1155,15 +1155,33 @@ const maadenLabel=v=>{ const m=MAADEN_GRADE[v];
 const AWPT_CODES=['RNC','RWC','Awaiting reply','Not submitted'];
 const CLASSES=['IFI','IFR','AWPT-only'];
 
-const SCOL={ 'Submitted':'var(--good)','Notsubmitted':'var(--hot)',
-  'Approved':'#0f9d58','Approved As Noted':'#6fc38a','Revise & Resubmit':'#d64545',
-  'Approved':'var(--good)','Approved As Noted':'var(--good)','Under Review':'var(--warn)',
-  'Revise & Resubmit':'var(--hot)','Rejected':'var(--hot)','Not Submitted':'var(--ink3)',
-  'Open':'var(--warn)','In Progress':'var(--sky)','Resolved':'var(--good)',
-  /* Ma'aden's codes, coloured as the LOD colours them */
-  'Code A':'#0f9d58','Deemed':'#4bb07a','Code B':'#6fc38a','Rejected':'#d64545',
-  'Replied':'var(--sky)','Under Client review':'var(--warn)','On hold':'#7030a0',
-  'RNC':'#6b7f92','RWC':'#7d8fa0','Awaiting reply':'var(--warn)','For Information':'var(--sky)' };
+/* ONE colour per status, and the dashboard bands read from here too, so a
+   state is the same colour wherever it appears. This object previously
+   declared 'Approved', 'Approved As Noted', 'Revise & Resubmit' and 'Rejected'
+   TWICE; the later entry silently won, which is why Approved and Approved As
+   Noted were rendering as the same green and the "To revise" band did not
+   match its own pill. The Ma'aden/LOD hues are the authority, so a drawing
+   reads the same in both apps. */
+const SCOL={
+  /* accepted */
+  'Approved':'#0f9d58','Code A':'#0f9d58','Submitted':'#0f9d58','Resolved':'#0f9d58',
+  'Deemed':'#4bb07a',
+  /* accepted with exceptions */
+  'Approved As Noted':'#6fc38a','Code B':'#6fc38a',
+  /* issued for information */
+  'Replied':'var(--sky)','For Information':'var(--sky)','In Progress':'var(--sky)',
+  /* with the reviewer */
+  'Under Review':'var(--warn)','Under Client review':'var(--warn)',
+  'Awaiting reply':'var(--warn)','Open':'var(--warn)',
+  /* returned */
+  'Revise & Resubmit':'#d64545','Rejected':'#d64545',
+  /* held */
+  'On hold':'#7030a0','Pending NWC':'#7030a0',
+  /* nothing sent */
+  'Not Submitted':'var(--ink3)','Notsubmitted':'var(--ink3)','Withdrawn':'var(--ink3)',
+  /* AWPT's own answers */
+  'RNC':'#6b7f92','RWC':'#7d8fa0' };
+const SC = s => SCOL[s] || 'var(--chip)';
 const pill = (s,row) => { if(!s)return '';
   /* the Client's letter only where the Client is Ma'aden */
   const maaden = row ? projectClient(row.project_id)==='Maaden'
@@ -3438,51 +3456,51 @@ function regSplit(tab){
   const st=[];
   if(tab==='asbuilts'||tab==='gis'){
     const done=r=>tab==='asbuilts'?AB_DONE(r.status):GIS_OK(r.review_status);
-    st.push({k:'done', t:'Approved',      c:'var(--good)',  s:'signed off, nothing outstanding',
+    st.push({k:'done', t:'Approved',      c:SC('Approved'),  s:'signed off, nothing outstanding',
              f:r=>done(r)});
     /* Returned with comments is an ANSWER, not a silence. Without this band a
        rejected drawing fell into "Awaiting reply — no answer yet", which is the
        opposite of what happened to it, and rejections were invisible. */
     if(tab==='asbuilts')
-      st.push({k:'rev',t:'To revise',     c:'var(--serious)',s:'returned with comments',
+      st.push({k:'rev',t:'To revise',     c:SC('Revise & Resubmit'),s:'returned with comments',
              f:r=>/revise|reject/i.test(r.status||'')});
-    st.push({k:'sent', t:'Awaiting reply',c:'var(--warn)',  s:'submitted, no answer yet',
+    st.push({k:'sent', t:'Awaiting reply',c:SC('Under Review'),  s:'submitted, no answer yet',
              f:r=>!done(r)&&r.submitted_date});
-    st.push({k:'none', t:'Not submitted', c:'var(--ink3)',  s:'no submission at all',
+    st.push({k:'none', t:'Not submitted', c:SC('Not Submitted'),  s:'no submission at all',
              f:r=>!done(r)&&!r.submitted_date});
   } else if(tab==='shop' && !isMaaden()){
     /* NWC's own words */
-    st.push({k:'ok',   t:'Approved',      c:'var(--good)',  s:'approved by the reviewer',
+    st.push({k:'ok',   t:'Approved',      c:SC('Approved'),  s:'approved by the reviewer',
              f:r=>GIS_OK(r.review_status)});
-    st.push({k:'rev',  t:'To revise',     c:'var(--serious)',s:'returned with comments',
+    st.push({k:'rev',  t:'To revise',     c:SC('Revise & Resubmit'),s:'returned with comments',
              f:r=>/revise|reject/i.test(r.review_status||'')});
-    st.push({k:'under',t:'Under review',  c:'var(--warn)',  s:'submitted, awaiting the reviewer',
+    st.push({k:'under',t:'Under review',  c:SC('Under Review'),  s:'submitted, awaiting the reviewer',
              f:r=>!GIS_OK(r.review_status)&&r.submitted_date});
-    st.push({k:'none', t:'Not submitted', c:'var(--ink3)',  s:'no submission at all',
+    st.push({k:'none', t:'Not submitted', c:SC('Not Submitted'),  s:'no submission at all',
              f:r=>true});
   } else if(tab==='shop'){
-    st.push({k:'a',    t:'A — accepted',  c:'#0f9d58',
+    st.push({k:'a',    t:'A — accepted',  c:SC('Code A'),
              s:"Code A, Deemed accepted", f:r=>/^(Code A|Deemed|Approved)$/.test(r.review_status||'')});
-    st.push({k:'c',    t:'C — with exceptions', c:'#6fc38a',
+    st.push({k:'c',    t:'C — with exceptions', c:SC('Code B'),
              s:'proceed with exceptions', f:r=>/^(Code B|Approved As Noted)$/.test(r.review_status||'')});
-    st.push({k:'i',    t:'I — for information', c:'var(--sky)',
+    st.push({k:'i',    t:'I — for information', c:SC('Replied'),
              s:'issued for information', f:r=>/^(Replied|For Information)$/.test(r.review_status||'')});
-    st.push({k:'r',    t:'R — do not proceed', c:'#d64545',
+    st.push({k:'r',    t:'R — do not proceed', c:SC('Rejected'),
              s:'revise and resubmit', f:r=>/^(Rejected|Revise & Resubmit)$/.test(r.review_status||'')});
-    st.push({k:'hold', t:'On hold',       c:'#7030a0', s:'held pending a prerequisite',
+    st.push({k:'hold', t:'On hold',       c:SC('On hold'), s:'held pending a prerequisite',
              f:r=>/^(On hold|Pending NWC)$/.test(r.review_status||'')});
-    st.push({k:'under',t:'With the Client',c:'var(--warn)', s:'submitted, awaiting their stamp',
+    st.push({k:'under',t:'With the Client',c:SC('Under Client review'), s:'submitted, awaiting their stamp',
              f:r=>r.submitted_date&&!/^(Not Submitted|Withdrawn)$/.test(r.review_status||'')});
-    st.push({k:'none', t:'Not submitted', c:'var(--ink3)', s:'no submission at all',
+    st.push({k:'none', t:'Not submitted', c:SC('Not Submitted'), s:'no submission at all',
              f:r=>true});
   } else {
-    st.push({k:'inv',  t:'Invoiced',      c:'var(--good)',  s:'carries an invoice number',
+    st.push({k:'inv',  t:'Invoiced',      c:SC('Submitted'),  s:'carries an invoice number',
              f:r=>String(r.invoice_no||'').trim()&&String(r.invoice_no)!=='0'});
-    st.push({k:'sub',  t:'Submitted',     c:'var(--warn)',  s:'submitted, not yet invoiced',
+    st.push({k:'sub',  t:'Submitted',     c:SC('Under Review'),  s:'submitted, not yet invoiced',
              f:r=>!(String(r.invoice_no||'').trim()&&String(r.invoice_no)!=='0')
                   &&String(r.status||'').trim().toLowerCase()==='submitted'});
     /* whatever is left — the states are tried in order, so this catches the rest */
-    st.push({k:'none', t:'Not submitted', c:'var(--ink3)',  s:'still to go', f:r=>true});
+    st.push({k:'none', t:'Not submitted', c:SC('Not Submitted'),  s:'still to go', f:r=>true});
   }
   /* each record falls in the FIRST state it matches, so nothing is counted twice */
   const seen=new Set(), out=st.map(x=>({...x,n:0}));
