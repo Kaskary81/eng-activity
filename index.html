@@ -966,7 +966,7 @@ body.breaking,body.breaking *{user-select:none!important;-webkit-user-select:non
 <script>
 const SB_URL='https://ivmmnsjiekhjxkhllncb.supabase.co';
 const SB_KEY='sb_publishable_RTHsaxZXVmRBQziLbFJX8g_PAaZzIbF';
-const BUILD='ENG 2026-09-08 · e80';
+const BUILD='ENG 2026-09-08 · e81';
 
 let SESSION=null, ME=null;
 let PROJECTS=[], PEOPLE=[], AB=[], SD=[], GIS=[], HIST=[], INV=[];
@@ -1195,15 +1195,8 @@ const COLS={
     {k:'days_action', t:'Days',     w:70},
     {k:'site',        t:'Site',     w:110},
     {k:'category',    t:'Building', w:150},
-    {k:'issue_status',t:'Issue',      w:70},
-    {k:'action_by',   t:'With',       w:120},
+    {k:'comments',    t:'ILF remark',w:110},
     {k:'zone',        t:'Zone',     w:90},
-    {k:'start_node',  t:'From',     w:100,cls:'mono'},
-    {k:'end_node',    t:'To',       w:100,cls:'mono'},
-    {k:'size_mm',     t:'Size mm',  w:80},
-    {k:'length_2d',   t:'Length m', w:90},
-    {k:'method',      t:'Method',   w:140},
-    {k:'invoice_no',  t:'Invoice',  w:80},
 
     {k:'project_id',  t:'Project',  w:150,calc:r=>projName(r.project_id)}
   ],
@@ -1336,7 +1329,7 @@ const EDIT={
   asbuilts:[['submittal_no','Submittal','text'],['description','Drawing','area'],
     ['discipline','Discipline','text'],['revision','Rev','num'],
     ['status','Status','sel',AB_STATUS],
-    ['site','Site','text'],
+    ['site','Site','text'],['comments','ILF remark','text'],
     ['submitted_date','Submitted','date'],['received_date','Approved by ILF','date'],
     ['category','Category','text'],['zone','Zone','text'],['comments','Comments','area']],
   shop:[['submittal_no','Submittal','text'],['description','Description','area'],
@@ -3447,6 +3440,12 @@ function regSplit(tab){
     const done=r=>tab==='asbuilts'?AB_DONE(r.status):GIS_OK(r.review_status);
     st.push({k:'done', t:'Approved',      c:'var(--good)',  s:'signed off, nothing outstanding',
              f:r=>done(r)});
+    /* Returned with comments is an ANSWER, not a silence. Without this band a
+       rejected drawing fell into "Awaiting reply — no answer yet", which is the
+       opposite of what happened to it, and rejections were invisible. */
+    if(tab==='asbuilts')
+      st.push({k:'rev',t:'To revise',     c:'var(--serious)',s:'returned with comments',
+             f:r=>/revise|reject/i.test(r.status||'')});
     st.push({k:'sent', t:'Awaiting reply',c:'var(--warn)',  s:'submitted, no answer yet',
              f:r=>!done(r)&&r.submitted_date});
     st.push({k:'none', t:'Not submitted', c:'var(--ink3)',  s:'no submission at all',
