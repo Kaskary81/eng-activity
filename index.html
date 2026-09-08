@@ -966,7 +966,7 @@ body.breaking,body.breaking *{user-select:none!important;-webkit-user-select:non
 <script>
 const SB_URL='https://ivmmnsjiekhjxkhllncb.supabase.co';
 const SB_KEY='sb_publishable_RTHsaxZXVmRBQziLbFJX8g_PAaZzIbF';
-const BUILD='ENG 2026-09-08 · e79';
+const BUILD='ENG 2026-09-08 · e80';
 
 let SESSION=null, ME=null;
 let PROJECTS=[], PEOPLE=[], AB=[], SD=[], GIS=[], HIST=[], INV=[];
@@ -1319,8 +1319,11 @@ const clientOf=pid=>{
   const p=(PROJECTS||[]).find(x=>x.id===(pid??PROJ));
   return (p&&p.client)||'NWC';
 };
-const isMaaden=()=>PROJ ? clientOf(PROJ)==='Maaden'
-                        : (PROJECTS||[]).some(p=>p.client==='Maaden');
+/* With no project selected the register holds both clients at once, so there
+   is no single review scheme to band it by. Ma'aden's A/C/R/I bands are used
+   only when a Ma'aden project is actually selected — otherwise an NWC drawing
+   would be presented under code letters its reviewer never issued. */
+const isMaaden=()=>PROJ ? clientOf(PROJ)==='Maaden' : false;
 Object.defineProperty(window,'REVIEW',{get(){
   if(PROJ)return clientOf(PROJ)==='Maaden'?REVIEW_MAADEN:REVIEW_NWC;
   return [...new Set([...REVIEW_NWC,...REVIEW_MAADEN])];
