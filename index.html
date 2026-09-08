@@ -966,7 +966,7 @@ body.breaking,body.breaking *{user-select:none!important;-webkit-user-select:non
 <script>
 const SB_URL='https://ivmmnsjiekhjxkhllncb.supabase.co';
 const SB_KEY='sb_publishable_RTHsaxZXVmRBQziLbFJX8g_PAaZzIbF';
-const BUILD='ENG 2026-09-08 · e82';
+const BUILD='ENG 2026-09-08 · e83';
 
 let SESSION=null, ME=null;
 let PROJECTS=[], PEOPLE=[], AB=[], SD=[], GIS=[], HIST=[], INV=[];
@@ -1374,6 +1374,22 @@ let DF={field:'',from:'',to:''};
 /* set by clicking anything on the dashboard: which register, which field,
    which value, and whether we want the finished or the outstanding part */
 let DRILL=null;
+/* Which column filters came from a dashboard click rather than from the
+   right-click Filter menu. A dashboard click clears its OWN leftovers; a
+   filter the user set by hand is theirs and survives. */
+let DASHCF=new Set();
+/* THE DASHBOARD IS ONE SELECTOR, NOT A STACK OF THEM.
+   Each panel states a number and clicking it should show exactly those
+   records. Before this, every click merely ADDED a filter: the tiles set F,
+   the state chips set RSTATE, the discipline bars set CFILT, and nothing was
+   ever cleared. So "As-builts submitted" followed by "To revise 17" asked for
+   approved AND rejected at once and returned an empty register, while the
+   panel still read 17. Every click now starts from a clean slate. */
+function dashReset(){
+  RSTATE=''; F=''; DRILL=null; Q=''; DF={field:'',from:'',to:''};
+  DASHCF.forEach(k=>delete CFILT[k]); DASHCF.clear();
+  try{ saveCFilt(); }catch(e){}
+}
 const DONEFN={
   shop:   r=>GIS_OK(r.review_status),
   gis:    r=>GIS_OK(r.review_status),
@@ -3849,13 +3865,23 @@ function wireRegCards(){
         if(g==='(not set)')delete CFILT[f]; else CFILT[f]=[g];
         saveCFilt();
       }
+      const keep=(f&&g)?{f,g}:null;
+      dashReset();
+      if(keep&&keep.g!=='(not set)'){ CFILT[keep.f]=[keep.g]; DASHCF.add(keep.f);
+        try{ saveCFilt(); }catch(e){} }
       RSTATE = el.dataset.rstate || '';
       VIEW='reg'; paint();
     };
   });
   document.querySelectorAll('[data-rstate]:not([data-group])').forEach(el=>{
     el.style.cursor='pointer';
-    el.onclick=()=>{ RSTATE=(RSTATE===el.dataset.rstate)?'':el.dataset.rstate;
+    el.onclick=()=>{ const want=el.dataset.rstate;
+      /* Clicking the same state again clears it — but only when it really is
+         the same selection. Coming from a discipline bar the state is already
+         set AND narrowed to that one discipline, so the top chip means "widen
+         this to every discipline", not "turn it off". */
+      const off=(RSTATE===want && DASHCF.size===0);
+      dashReset(); if(!off)RSTATE=want;
       VIEW='reg'; paint(); };
   });
 }
@@ -4145,8 +4171,7 @@ function wireDash(){
     el.style.cursor='pointer';
     el.onclick=()=>{
       const [tab,state,label]=el.dataset.kpi.split('|');
-      DRILL=null; TAB=tab; VIEW='reg'; F=(state==='done'?'done':'open'); Q='';
-      DF={field:'',from:'',to:''};
+      dashReset(); TAB=tab; VIEW='reg'; F=(state==='done'?'done':'open');
       paint();
       const w=$wrap(); if(w)w.scrollTop=0;
       toast(rowsNow().length+' · '+label);};});
