@@ -973,6 +973,8 @@ body.breaking,body.breaking *{user-select:none!important;-webkit-user-select:non
     <button class="tbbtn" data-view="dash">◔ Dashboard</button>
     <button class="tbbtn" data-view="late">◷ Overdue</button>
     <button class="tbbtn" id="winbtn" title="Open this view in a window — several can sit side by side">⧉ Window</button>
+    <button class="tbbtn" id="pairbtn"
+      title="Open the register and its dashboard together, one either side">⫿⫿ Side by side</button>
     <button class="tbbtn" id="tidybtn" title="Tidy the windows" style="display:none">▦ Arrange</button>
     <div class="grow"></div>
     <button class="iconb bell" id="alerts" title="Notifications"><svg viewBox="0 0 24 24"
@@ -1002,7 +1004,7 @@ body.breaking,body.breaking *{user-select:none!important;-webkit-user-select:non
 <script>
 const SB_URL='https://ivmmnsjiekhjxkhllncb.supabase.co';
 const SB_KEY='sb_publishable_RTHsaxZXVmRBQziLbFJX8g_PAaZzIbF';
-const BUILD='ENG 2026-09-08 · e89';
+const BUILD='ENG 2026-09-08 · e90';
 
 let SESSION=null, ME=null;
 let PROJECTS=[], PEOPLE=[], AB=[], SD=[], GIS=[], HIST=[], INV=[];
@@ -1750,6 +1752,8 @@ function paintNav(){
     b.onclick=()=>goView(b.dataset.view);});
   const wb=document.getElementById('winbtn');
   if(wb)wb.onclick=()=>openCurrentAsWindow();
+  const pb=document.getElementById('pairbtn');
+  if(pb){ pb.onclick=()=>openSideBySide(); pb.style.display=isPhone()?'none':''; }
   const tb=document.getElementById('tidybtn');
   if(tb)tb.onclick=()=>arrangeWins();
   const tabs=[['dash','Overview'],['reg','Register'],['plan','Plan'],['late','Overdue'],['more','More']];
@@ -3029,6 +3033,25 @@ function dragEnd(){
 }
 window.addEventListener('resize',()=>WINS.forEach(w=>applyRect(w)));
 /* open whatever is on screen as a window */
+
+/* Register on the left, its dashboard on the right — the pair the LOD opens,
+   each filling half the desktop so they can be read together. */
+function openSideBySide(){
+  if(isPhone())return toast('One screen at a time on a phone');
+  const reg=openRegisterWindow(TAB), dash=openDashWindow();
+  const D=desk();
+  const W=D.clientWidth, H=D.clientHeight, gap=6;
+  const half=Math.floor((W-gap*3)/2);
+  [[reg,gap],[dash,gap*2+half]].forEach(([w,x])=>{
+    if(!w)return;
+    w.max=false; w.min=false;
+    w.x=x; w.y=gap; w.w=half; w.h=H-gap*2;
+    applyRect(w);
+  });
+  if(dash)focusWin(dash.id);
+  renderDock();
+}
+
 function openCurrentAsWindow(){
   if(isPhone())return;          /* one screen at a time on a phone */
   if(VIEW==='reg')      openRegisterWindow(TAB);
@@ -3045,11 +3068,13 @@ function openRegisterWindow(tab){
   const win=createWindow('reg:'+t,'Register · '+label,
     rowsOf(t).length+' records', w=>paintTable());
   win.tab=t; win.view='reg'; drawWin(win);
+  return win;
 }
 function openDashWindow(){
   const win=createWindow('dash','Dashboard',
     (TABS.find(x=>x.k===TAB)||{}).t||'', w=>paintOverview());
   win.tab=TAB; win.view='dash'; drawWin(win);
+  return win;
 }
 function openPlanWindow(){
   const win=createWindow('plan','Plan','this week', w=>paintPlan());
