@@ -1004,7 +1004,7 @@ body.breaking,body.breaking *{user-select:none!important;-webkit-user-select:non
 <script>
 const SB_URL='https://ivmmnsjiekhjxkhllncb.supabase.co';
 const SB_KEY='sb_publishable_RTHsaxZXVmRBQziLbFJX8g_PAaZzIbF';
-const BUILD='ENG 2026-09-08 · e90';
+const BUILD='ENG 2026-09-08 · e91';
 
 let SESSION=null, ME=null;
 let PROJECTS=[], PEOPLE=[], AB=[], SD=[], GIS=[], HIST=[], INV=[];
@@ -1429,6 +1429,17 @@ let DASHCF=new Set();
    ever cleared. So "As-builts submitted" followed by "To revise 17" asked for
    approved AND rejected at once and returned an empty register, while the
    panel still read 17. Every click now starts from a clean slate. */
+/* Where to send the result of a dashboard click. In single-view mode that is
+   the main layout; in window mode the register is a separate window, so the
+   windows are redrawn instead — opening or focusing the right register if the
+   click named a tab. */
+function dashApply(tab){
+  if(WINMODE){
+    if(tab){ const rw=[...WINS.values()].find(w=>w.kind==='reg:'+tab);
+      if(rw)focusWin(rw.id); else openRegisterWindow(tab); }
+    redrawWins();
+  }else{ VIEW='reg'; paint(); }
+}
 function dashReset(){
   RSTATE=''; F=''; DRILL=null; Q=''; DF={field:'',from:'',to:''};
   DASHCF.forEach(k=>delete CFILT[k]); DASHCF.clear();
@@ -1451,14 +1462,14 @@ function drillMatch(r){
 }
 function goDrill(tab,field,value,state,label){
   DRILL={tab,field,value,state,label};
-  TAB=tab; VIEW='reg'; F=''; Q=''; DF={field:'',from:'',to:''};
+  TAB=tab;  F=''; Q=''; DF={field:'',from:'',to:''};
   loadColPref(); loadCFilt();
-  paint();
+  dashApply(tab);
   const w=$wrap(); if(w)w.scrollTop=0;
   const n=rowsNow().length;
   toast(n+' record'+(n===1?'':'s')+' · '+label);
 }
-function clearDrill(){ DRILL=null; paint(); }
+function clearDrill(){ DRILL=null; dashApply(); }
 const canEdit=()=>ME&&(ME.role==='admin'||ME.role==='editor');
 
 function rowsOf(tab){ return tab==='gis'?gisFor()
@@ -1792,7 +1803,7 @@ function paintOverdue(){
     </article>`).join('')}</div>`;
   $wrap().querySelectorAll('[data-go]').forEach(el=>el.onclick=()=>{
     const [tab,id]=el.dataset.go.split(':');
-    TAB=tab; VIEW='reg'; paint(); openSheet(+id);});
+    TAB=tab; dashApply(tab); openSheet(+id);});
 }
 
 /* ---------- Plan: what is meant to go out, week by week ---------- */
@@ -2745,7 +2756,7 @@ function announce(fresh){
     try{
       const note=new Notification(title,{body,tag:'eng',icon:''});
       note.onclick=()=>{ window.focus(); note.close();
-        TAB=f.tab; VIEW='reg'; paint(); openSheet&&openSheet(f.row.id); };
+        TAB=f.tab; dashApply(f.tab); openSheet&&openSheet(f.row.id); };
     }catch(e){}
   }
   toast(n===1?('New — '+what):(n+' new records came in'));
@@ -2823,7 +2834,7 @@ function feedBox(){
   m.querySelectorAll('[data-f]').forEach(el=>el.onclick=()=>{
     const x=items[+el.dataset.f];
     m.classList.remove('on');
-    TAB=x.tab; VIEW='reg'; paint(); openSheet(x.id);
+    TAB=x.tab; dashApply(x.tab); openSheet(x.id);
   });
   const a=m.querySelector('#feedalerts'); if(a)a.onclick=()=>{ m.classList.remove('on'); alertsBox(); };
   markSeen(); paintBell();
@@ -3071,8 +3082,12 @@ function openRegisterWindow(tab){
   return win;
 }
 function openDashWindow(){
+  /* paint() wires the dashboard after painting it; drawWin() never did, so in
+     window mode the charts and chips were drawn with no click handler on them
+     at all — pressing one did nothing. */
   const win=createWindow('dash','Dashboard',
-    (TABS.find(x=>x.k===TAB)||{}).t||'', w=>paintOverview());
+    (TABS.find(x=>x.k===TAB)||{}).t||'',
+    w=>{ paintOverview(); wireDash(); wireRegCards(); attachLoupe(); });
   win.tab=TAB; win.view='dash'; drawWin(win);
   return win;
 }
@@ -4306,7 +4321,7 @@ function wireRegCards(){
       if(keep&&keep.g!=='(not set)'){ CFILT[keep.f]=[keep.g]; DASHCF.add(keep.f);
         try{ saveCFilt(); }catch(e){} }
       RSTATE = el.dataset.rstate || '';
-      VIEW='reg'; paint();
+      dashApply();
     };
   });
   document.querySelectorAll('[data-rstate]:not([data-group])').forEach(el=>{
@@ -4318,7 +4333,7 @@ function wireRegCards(){
          this to every discipline", not "turn it off". */
       const off=(RSTATE===want && DASHCF.size===0);
       dashReset(); if(!off)RSTATE=want;
-      VIEW='reg'; paint(); };
+      dashApply(); };
   });
 }
 
@@ -4597,6 +4612,9 @@ function discSection(field,title,states){
 }
 
 function wireDash(){
+  /* Wired here rather than inside paint() so the dashboard WINDOW gets it too. */
+  document.querySelectorAll('.dtbl tr[data-open]').forEach(tr=>
+    tr.onclick=()=>{ dashApply(); openSheet(+tr.dataset.open); });
   document.querySelectorAll('[data-drill]').forEach(el=>{
     el.style.cursor='pointer';
     el.onclick=e=>{e.stopPropagation();
@@ -4607,7 +4625,7 @@ function wireDash(){
     el.style.cursor='pointer';
     el.onclick=()=>{
       const [tab,state,label]=el.dataset.kpi.split('|');
-      dashReset(); TAB=tab; VIEW='reg'; F=(state==='done'?'done':'open');
+      dashReset(); TAB=tab; F=(state==='done'?'done':'open'); dashApply(tab);
       paint();
       const w=$wrap(); if(w)w.scrollTop=0;
       toast(rowsNow().length+' · '+label);};});
@@ -4629,9 +4647,7 @@ function paint(){
   $('crumb').textContent   = onReg?'':VIEWLABEL[VIEW]||'';
   $('crumb').style.display = onReg?'none':'';
   if(onReg){ paintTabs(); paintKpis(); paintTools(); paintTable(); }
-  else if(VIEW==='dash'){ paintKpis(); paintOverview(); wireDash(); wireRegCards(); attachLoupe();
-    document.querySelectorAll('.dtbl tr[data-open]').forEach(tr=>
-      tr.onclick=()=>{ VIEW='reg'; paint(); openSheet(+tr.dataset.open); }); }
+  else if(VIEW==='dash'){ paintKpis(); paintOverview(); wireDash(); wireRegCards(); attachLoupe(); }
   else if(VIEW==='plan'){ paintPlan(); }
   else if(VIEW==='late'){ paintOverdue(); }
   else { paintMore(); }
